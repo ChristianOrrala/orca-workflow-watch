@@ -2,7 +2,7 @@
 // calls the worker makes (environment list, plugin dev request … --environment) from a runs
 // folder on this computer, read with the plugin's own model: the real CLI path, minus Orca.
 //
-//   FAKE_ORCA_ROOT=<runs folder> FAKE_ORCA_NAME="Mac mini" [FAKE_ORCA_KEY=local.odw-watch|none] dev/fake-orca environment list --json
+//   FAKE_ORCA_ROOT=<runs folder> FAKE_ORCA_NAME="Mac mini" [FAKE_ORCA_KEY=none] dev/fake-orca environment list --json
 import { join } from 'node:path'
 import { listRunDirs, readAgent, RunWatch } from '../src/model.ts'
 
@@ -20,8 +20,7 @@ if (args[0] === 'environment' && args[1] === 'list') {
     out({ ok: false, error: { code: 'runtime_unreachable', message: `could not connect to ${name}` } })
     process.exit(1)
   }
-  // The plugin key the fake server's copy answers to: local.odw-watch plays a server still on
-  // the old name, none one without the plugin.
+  // The plugin key the fake server's copy answers to: none plays a server without the plugin.
   const key = process.env.FAKE_ORCA_KEY ?? 'local.orca-workflow-watch'
   if (args[3] !== key) {
     out({ ok: false, error: { code: 'plugin_not_found', message: `${args[3]} is not loaded on ${name}` } })
@@ -30,8 +29,8 @@ if (args[0] === 'environment' && args[1] === 'list') {
   const dirs = listRunDirs(root).slice(0, 12)
   if (what === 'watch.snapshot') {
     const runs = dirs.map((d) => new RunWatch(d.runId, d.dir).refresh())
-    out({ ok: true, result: { pluginKey: args[3], name: what, result: { root: '~/.odw/runs', rootExists: true, runs, hosts: [], localName: name, scannedAt: Date.now(), error: null } } })
-  } else if (what === 'watch.log' && !process.env.FAKE_ORCA_OLD) {
+    out({ ok: true, result: { pluginKey: args[3], name: what, result: { rootExists: true, engines: [{ id: 'odw', label: 'ODW', root: '~/.odw/runs', rootExists: true, hint: null }], runs, hosts: [], localName: name, scannedAt: Date.now(), error: null } } })
+  } else if (what === 'watch.log') {
     const found = dirs.find((d) => d.runId === data.runId)
     const watch = found ? new RunWatch(found.runId, found.dir) : null
     watch?.refresh()

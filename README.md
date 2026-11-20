@@ -3,8 +3,8 @@
 An Orca plugin that shows workflow runs live in the right sidebar, from two engines side by side: [Open Dynamic Workflows](https://github.com/xz1220/open-dynamic-workflows) (ODW) and [AgentPrism Workflows](https://github.com/agentprism/agentprism-workflows).
 
 - **A card per live run:** a ticking clock, a phase rail (finished phases green, the current one striped), and every agent as a bead that pulses while it works. Earlier phases shrink to one line of dots, a failed agent is a red diamond, and a run that finishes gets a short shimmer (a red wash if it failed) before it settles into the history. Loops pause while Orca's window is hidden.
-- **Phase times:** each phase in the open card shows how long it took (`1:36:42`, or `4:05` under an hour); the current one ticks. A phase of commands only takes its span from its commands, so ODW's Preflight, marked after its commands ran, shows their real time; from a paired server on an older plugin, which sends that phase as one instant, it reads the gap it sits in, marked `~`. History rows show each phase's time on hover over the metro line.
-- **The whole log on demand:** the card shows the run's last lines; "Show all N events" opens every line the worker keeps (the newest 500, with a note of how many older ones were dropped) in a dialog over the panel, newest at the bottom. It updates while the run runs: left at the bottom it follows new lines, scrolled up it stays put. Close it with its button, Esc or a click outside it. It works for runs on paired servers too; one on an older plugin keeps the short log.
+- **Phase times:** each phase in the open card shows how long it took (`1:36:42`, or `4:05` under an hour); the current one ticks. A phase of commands only takes its span from its commands, so ODW's Preflight, marked after its commands ran, shows their real time. History rows show each phase's time on hover over the metro line.
+- **The whole log on demand:** the card shows the run's last lines; "Show all N events" opens every line the worker keeps (the newest 500, with a note of how many older ones were dropped) in a dialog over the panel, newest at the bottom. It updates while the run runs: left at the bottom it follows new lines, scrolled up it stays put. Close it with its button, Esc or a click outside it. It works for runs on paired servers too.
 - **Checkpoints stand out:** a run waiting at `checkpoint()` turns amber and shows how to answer it, with a Copy button (the worker copies on the computer you're at): ODW's `odw approve <run>` command, or for AgentPrism the `resume` call to give its workflow tool from an agent working in that project.
 - **Click any agent:** it opens a sheet with what it was asked, what it answered (or its latest output while it runs), its stderr, adapter, time and tokens.
 - **History rows:** finished runs, each with a "barcode" of its agents' durations. Click a row to open the full card. Back-to-back runs of one workflow that all ended well fold into one row (`review-swarm ×7`) that opens; a failure or a question keeps its own row, and a question a newer run took over reads "Asked".
@@ -52,19 +52,7 @@ orca plugin dev load ./orca-workflow-watch --approve <fingerprint> --json
 # later: git pull, then orca plugin dev reload ./orca-workflow-watch
 ```
 
-The panel then lists each paired server in its header; one without the plugin reads "not set up". A server still on the old name (`odw-watch`, up to 0.1.4) is asked under its old key, so mixed versions see each other until every server is renamed.
-
-### Renamed from odw-watch
-
-Up to 0.1.4 the plugin was "Workflow Watch", id `odw-watch` (key `local.odw-watch`); from 0.2.0 it is "Orca Workflow Watch", id `orca-workflow-watch` (key `local.orca-workflow-watch`). Orca sees it as a new plugin, so on each computer:
-
-```sh
-orca plugin dev unload <old folder> --json          # the odw-watch checkout, e.g. ./orca-odw-watch
-orca plugin dev load ./orca-workflow-watch --json   # approve the new plugin once, as above
-# installed rather than dev-loaded: orca plugin uninstall <old key>, then install as above
-```
-
-Settings stay with the old key and do not carry over. If you had changed the runs folders, set them again (in the plugin's settings or the panel footer): **Runs folder** (ODW) and **AgentPrism runs folder**. Paired servers to watch, the Orca CLI path, Notify me and Finished runs to show start at their defaults too.
+The panel then lists each paired server in its header; one without the plugin reads "not set up". Every computer runs the same version: update them together.
 
 ## Access it asks for
 

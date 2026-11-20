@@ -18,15 +18,12 @@ import { isAgentId } from './model'
 import type { RunSource } from './sources/types'
 import { OdwSource } from './sources/odw'
 import { AgentPrismSource } from './sources/agentprism'
-import { expandHome, shortHome } from './sources/paths'
+import { expandHome } from './sources/paths'
 
 const DEFAULT_ROOT = '~/.odw/runs'
 const DEFAULT_AGENTPRISM_ROOT = '~/.agentprism/workflows'
-/**
- * This plugin's key on a paired server, newest first: a server still on the plugin's old name
- * (odw-watch, up to 0.1.4) answers to the old one, so mixed versions still see each other.
- */
-const PLUGIN_KEYS = ['local.orca-workflow-watch', 'local.odw-watch']
+/** This plugin's key on a paired server. */
+const PLUGIN_KEY = 'local.orca-workflow-watch'
 const STATUS_ITEM = 'workflows'
 const FAST_MS = 1000
 const SLOW_MS = 5000
@@ -100,7 +97,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   let primed = false
   // Hosts whose runs have been seen once: only their later changes are announced.
   const primedHosts = new Set<string>()
-  let local: Snapshot = { root: shortHome(odw.root), rootExists: false, engines: [], runs: [], hosts: [], localName, scannedAt: 0, error: null }
+  let local: Snapshot = { rootExists: false, engines: [], runs: [], hosts: [], localName, scannedAt: 0, error: null }
   let snapshot: Snapshot = local
   let lastPosted = ''
   let lastPostAt = 0
@@ -113,7 +110,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   let run = cliRunner(findOrcaCli(null))
   const remote = new RemoteHosts({
     run: (args, timeoutMs) => run(args, timeoutMs),
-    pluginKeys: () => PLUGIN_KEYS,
+    pluginKey: PLUGIN_KEY,
     wanted: () => remotesWanted,
     onChange: () => publish(),
     log: (message) => orca.log(message),
@@ -139,7 +136,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       engines.push({ ...source.info(), error })
     }
     runs.sort(byLiveThenNewest)
-    return { root: shortHome(odw.root), rootExists: engines.some((e) => e.rootExists), engines, runs, hosts: [], localName, scannedAt: Date.now(), error: null }
+    return { rootExists: engines.some((e) => e.rootExists), engines, runs, hosts: [], localName, scannedAt: Date.now(), error: null }
   }
 
   function announce(view: RunView, before: RunState | undefined): void {
@@ -194,7 +191,7 @@ export default function activate(orca: OrcaWorkerApi): void {
         ? `${agents} agent${agents === 1 ? '' : 's'} working${paused.length ? `, ${paused.length} paused` : ''}`
         : paused.length
           ? paused.map((r) => `${r.workflow}${where(r)}: ${r.error ?? 'paused'}`).join('\n')
-          : `Watching ${(next.engines ?? []).map((e) => `${e.label} ${e.root}`).join(', ') || next.root}${next.hosts.length ? `, and ${next.hosts.map((h) => h.name).join(', ')}` : ''}`
+          : `Watching ${next.engines.map((e) => `${e.label} ${e.root}`).join(', ')}${next.hosts.length ? `, and ${next.hosts.map((h) => h.name).join(', ')}` : ''}`
     const key = JSON.stringify([params, tooltip])
     if (key === lastStatus) return
     lastStatus = key
@@ -235,7 +232,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   function publish(): Snapshot {
     const remoteRuns = remote
       .snapshots()
-      .flatMap(({ env, snapshot: s }) => s.runs.map((r) => ({ ...r, engine: r.engine ?? ('odw' as const), answer: r.answer ?? null, host: env.id, hostName: env.name })))
+      .flatMap(({ env, snapshot: s }) => s.runs.map((r) => ({ ...r, host: env.id, hostName: env.name })))
     // Live runs from every host, then the newest finished ones across all of them.
     const all = [...local.runs, ...remoteRuns].sort(byLiveThenNewest)
     let finished = 0

@@ -1,6 +1,6 @@
 // What a paired server sends is checked before it is used: a run that does not have the shape
 // of a RunView is dropped, and every field the worker or the panel reads gets a safe value. A
-// peer on an older plugin, or a broken one, then costs its own runs only.
+// broken peer then costs its own runs only.
 import type { AgentView, Answer, Checkpoint, EngineId, LogLine, Outcome, PhaseView, RunLog, RunView } from './protocol'
 
 type Obj = Record<string, unknown>
@@ -95,6 +95,7 @@ export function normalizeRun(v: unknown): RunView | null {
   const waiting = isObj(v.waiting)
     ? { title: text(v.waiting.title, 400) ?? 'a checkpoint', since: time(v.waiting.since) ?? startedAt, checkpointId: time(v.waiting.checkpointId) }
     : null
+  const log = (Array.isArray(v.log) ? v.log : []).slice(-LOG_LINES_MAX).map(logOf).filter((l): l is LogLine => l !== null)
   return {
     id: v.id,
     engine: oneOf(v.engine, ENGINES, 'odw'),
@@ -114,8 +115,8 @@ export function normalizeRun(v: unknown): RunView | null {
     phases: (Array.isArray(v.phases) ? v.phases : []).map(phaseOf).filter((p): p is PhaseView => p !== null),
     agents: { total: count(agents.total), running: count(agents.running), done: count(agents.done), failed: count(agents.failed) },
     tokens: { spent: count(tokens.spent), budget: time(tokens.budget) },
-    log: (Array.isArray(v.log) ? v.log : []).slice(-LOG_LINES_MAX).map(logOf).filter((l): l is LogLine => l !== null),
-    logCount: typeof v.logCount === 'number' ? count(v.logCount) : null,
+    log,
+    logCount: Math.max(count(v.logCount), log.length),
     waiting,
     checkpoints: (Array.isArray(v.checkpoints) ? v.checkpoints : []).slice(-24).map(checkpointOf).filter((c): c is Checkpoint => c !== null),
     answer: answerOf(v.answer),

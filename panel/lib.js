@@ -5,7 +5,6 @@
   'use strict'
 
   const LIVE = new Set(['running', 'waiting', 'paused'])
-  const commandsOf = (p) => p.commands.running + p.commands.done + p.commands.failed
 
   /** A span as a clock: `1:36:42` from an hour, `4:05` under it, `<1s` under a second. */
   function duration(ms) {
@@ -19,54 +18,28 @@
 
   /**
    * How long each phase of `run` took, in its order: null for a phase that has not run (pending
-   * or skipped), `{ ms, live, approx, from, to }` for the others. The active phase of a live run
-   * counts up to `now` (`live`); a paused run's stops where it paused.
-   *
-   * A phase whose start and end are one instant though it ran commands (ODW marks Preflight
-   * only once its commands have run, and a worker before 0.1.3 sent no command times) did take
-   * time: that phase reads the gap it sits in, from the end of the phase before (or the run's
-   * start) to the start of the next one (or the run's end), as `approx`, never a made-up 0:00.
-   * A gap under a second, or no next phase yet, reads as the instant it was: `<1s`.
+   * or skipped), `{ ms, live, from, to }` for the others. The active phase of a live run counts up
+   * to `now` (`live`); a paused run's stops where it paused. A phase of commands gets its span
+   * from its commands in the worker; one marked as a single instant reads as that: `<1s`.
    */
   function phaseTimes(run, now) {
     const phases = run.phases || []
     const moving = LIVE.has(run.state) && run.state !== 'paused'
     const runEnd = run.endedAt != null ? run.endedAt : moving ? null : run.updatedAt
-    return phases.map((p, i) => {
+    return phases.map((p) => {
       if (p.state === 'pending' || p.state === 'skipped' || p.startedAt == null) return null
       if (p.state === 'active') {
         const end = moving ? now : runEnd != null ? runEnd : now
-        return { ms: Math.max(0, end - p.startedAt), live: moving, approx: false, from: p.startedAt, to: moving ? null : end }
+        return { ms: Math.max(0, end - p.startedAt), live: moving, from: p.startedAt, to: moving ? null : end }
       }
       const end = p.endedAt != null ? p.endedAt : p.startedAt
-      const exact = { ms: Math.max(0, end - p.startedAt), live: false, approx: false, from: p.startedAt, to: end }
-      if (exact.ms >= 1000 || !commandsOf(p)) return exact
-      let from = run.startedAt
-      for (let k = i - 1; k >= 0; k--) {
-        const q = phases[k]
-        if (q.state === 'pending' || q.state === 'skipped' || q.startedAt == null) continue
-        from = q.endedAt != null ? q.endedAt : q.startedAt
-        break
-      }
-      let to = null
-      for (let k = i + 1; k < phases.length; k++) {
-        if (phases[k].startedAt != null) {
-          to = phases[k].startedAt
-          break
-        }
-      }
-      if (to == null) to = runEnd
-      if (to == null) return exact
-      from = Math.min(from, p.startedAt)
-      to = Math.max(to, end)
-      return to - from >= 1000 ? { ms: to - from, live: false, approx: true, from, to } : exact
+      return { ms: Math.max(0, end - p.startedAt), live: false, from: p.startedAt, to: end }
     })
   }
 
-  /** A phase's time as its band shows it: `~` marks one read from the phases around it. */
+  /** A phase's time as its band shows it. */
   function phaseLabel(t) {
-    if (!t) return ''
-    return `${t.approx ? '~' : ''}${duration(t.ms)}`
+    return t ? duration(t.ms) : ''
   }
 
   const lineKey = (l) => `${l.ts}:${l.text}`

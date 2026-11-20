@@ -55,7 +55,7 @@ export interface Answer {
 
 export interface RunView {
   id: string
-  /** Which engine ran it; a paired server on an older plugin sends none, which means odw. */
+  /** Which engine ran it. */
   engine: EngineId
   /** The paired Orca server the run lives on; null for this computer. */
   host: string | null
@@ -83,12 +83,12 @@ export interface RunView {
   tokens: { spent: number; budget: number | null }
   /** The last few log lines; the rest come from `watch.log`. */
   log: LogLine[]
-  /** Every line the run logged, the dropped ones included; null from a peer on an older plugin. */
-  logCount: number | null
+  /** Every line the run logged, the dropped ones included. */
+  logCount: number
   waiting: { title: string; since: number; checkpointId: number | null } | null
   /**
    * Every checkpoint the run stopped at, oldest first: when it asked and when it was answered
-   * (null while it still waits). A peer on an older plugin sends none.
+   * (null while it still waits).
    */
   checkpoints: Checkpoint[]
   /** How to answer `waiting`, in the engine's own terms; null when the run is not waiting. */
@@ -142,11 +142,9 @@ export interface EngineInfo {
 }
 
 export interface Snapshot {
-  /** ODW's folder (kept for paired servers on an older plugin); see `engines`. */
-  root: string
   /** True when any engine's folder exists. */
   rootExists: boolean
-  engines?: EngineInfo[]
+  engines: EngineInfo[]
   runs: RunView[]
   /** Paired servers watched besides this computer; empty when there are none. */
   hosts: HostStatus[]

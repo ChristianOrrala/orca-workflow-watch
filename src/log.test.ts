@@ -1,5 +1,5 @@
-// Phase times and the full event log (0.1.3): what the worker keeps and sends, what a paired
-// server on an older plugin still gets, and the panel's own helpers (panel/lib.js).
+// Phase times and the full event log (0.1.3): what the worker keeps and sends, and the panel's
+// own helpers (panel/lib.js).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
@@ -9,7 +9,7 @@ import { normalizeLog, normalizeRun } from './wire'
 
 const lib = createRequire(import.meta.url)('../panel/lib.js') as {
   duration(ms: number): string
-  phaseTimes(run: unknown, now: number): ({ ms: number; live: boolean; approx: boolean; from: number; to: number | null } | null)[]
+  phaseTimes(run: unknown, now: number): ({ ms: number; live: boolean; from: number; to: number | null } | null)[]
   phaseLabel(t: unknown): string
   mergeLog(full: unknown[], tail: unknown[]): { ts: number; text: string }[]
   atBottom(scrollTop: number, clientHeight: number, scrollHeight: number): boolean
@@ -58,11 +58,10 @@ test('a command-only phase spans its commands, even when ODW marks the phase aft
   assert.equal(tasks.state, 'active')
   const times = lib.phaseTimes(view, at(160) * 1000)
   assert.equal(lib.phaseLabel(times[0]), '1:35')
-  assert.equal(times[0]?.approx, false)
   assert.deepEqual([lib.phaseLabel(times[1]), times[1]?.live], ['1:03', true], 'the active phase ticks from its start')
 })
 
-test('an older peer sends Preflight as one instant: the panel reads the gap it sits in, marked ~', () => {
+test('a phase marked as one instant reads as that instant; skipped and pending phases show nothing', () => {
   const ms = (s: number) => at(s) * 1000
   const phase = (title: string, state: string, startedAt: number | null, endedAt: number | null, commands = 0) => ({
     title,
@@ -81,25 +80,16 @@ test('an older peer sends Preflight as one instant: the panel reads the gap it s
     phases: [
       phase('Preflight', 'done', ms(96), ms(96), 3),
       phase('Tasks', 'done', ms(100), ms(3900)),
-      phase('Notes', 'done', ms(3900), ms(3900)),
       phase('Merge', 'skipped', null, null),
       phase('Ship', 'pending', null, null),
     ],
   }
   const times = lib.phaseTimes(run, ms(5000))
-  // From the run's start (no phase before it) to Tasks' start: 100 s, not 0:00.
-  assert.deepEqual([times[0]?.ms, times[0]?.approx, lib.phaseLabel(times[0])], [100_000, true, '~1:40'])
+  // The worker gives a phase of commands its commands' span; one instant is never widened here.
+  assert.deepEqual([times[0]?.ms, lib.phaseLabel(times[0])], [0, '<1s'])
   assert.equal(lib.phaseLabel(times[1]), '1:03:20')
-  // No commands, no agents, one instant: it really took no time.
-  assert.equal(lib.phaseLabel(times[2]), '<1s')
-  assert.equal(times[3], null, 'skipped phases show nothing')
-  assert.equal(times[4], null, 'pending phases show nothing')
-
-  // A gap under a second stays the instant it was; a live run with nothing after it yet too.
-  const tight = { ...run, phases: [phase('Preflight', 'done', ms(0.2), ms(0.2), 1), phase('Tasks', 'active', ms(0.5), null)], state: 'running', endedAt: null }
-  assert.equal(lib.phaseLabel(lib.phaseTimes(tight, ms(10))[0]), '<1s')
-  const alone = { ...tight, phases: [phase('Preflight', 'done', ms(5), ms(5), 1)] }
-  assert.equal(lib.phaseLabel(lib.phaseTimes(alone, ms(10))[0]), '<1s')
+  assert.equal(times[2], null, 'skipped phases show nothing')
+  assert.equal(times[3], null, 'pending phases show nothing')
 })
 
 test('a paused run’s active phase stops where it paused; a live one counts up to now', () => {
@@ -127,10 +117,10 @@ test('the worker keeps the newest LOG_KEEP lines and counts the rest; the snapsh
   assert.equal(full.lines.at(-1)?.text, `line ${LOG_KEEP + 119}`, 'oldest first, newest at the bottom')
 })
 
-test('a peer’s run without logCount (older plugin) still reads, with its short log', () => {
-  const old = normalizeRun({ id: 'r1', workflow: 'wf', state: 'running', startedAt: 1, log: [{ ts: 1, text: 'hello', tone: 'info' }] })
-  assert.equal(old?.logCount, null)
-  assert.deepEqual(old?.log.map((l) => l.text), ['hello'])
+test('a peer’s logCount is never less than the lines it sent', () => {
+  const run = normalizeRun({ id: 'r1', workflow: 'wf', state: 'running', startedAt: 1, log: [{ ts: 1, text: 'hello', tone: 'info' }] })
+  assert.equal(run?.logCount, 1)
+  assert.deepEqual(run?.log.map((l) => l.text), ['hello'])
   assert.equal(normalizeRun({ id: 'r1', workflow: 'wf', state: 'running', startedAt: 1, logCount: 42 })?.logCount, 42)
 })
 
@@ -143,21 +133,17 @@ test('a peer’s full log is checked line by line and capped at the newest 500',
   assert.equal(normalizeLog({ nope: true }, 'r1'), null)
 })
 
-test('the full log of a run on a paired server is asked of that server; an older one says it cannot', async () => {
+test('the full log of a run on a paired server is asked of that server', async () => {
   const ok = (result: unknown): CliResult => ({ code: 0, stdout: JSON.stringify({ ok: true, result }), stderr: '' })
   const calls: string[][] = []
-  let old = false
   const remote = new RemoteHosts({
     run: async (args) => {
       calls.push(args)
       if (args[0] === 'environment') return ok({ environments: [{ id: 'env-mini', name: 'Mac mini' }] })
-      if (args[4] === 'watch.log') {
-        if (old) return { code: 1, stdout: JSON.stringify({ ok: false, error: { code: 'plugin_request_failed', message: 'no handler', data: { requestCode: 'unknown_method' } } }), stderr: '' }
-        return ok({ result: { runId: 'r1', lines: [{ ts: 1, text: 'a', tone: 'warn' }], dropped: 0 } })
-      }
+      if (args[4] === 'watch.log') return ok({ result: { runId: 'r1', lines: [{ ts: 1, text: 'a', tone: 'warn' }], dropped: 0 } })
       return ok({ result: { runs: [] } })
     },
-    pluginKeys: () => ['local.orca-workflow-watch', 'local.odw-watch'],
+    pluginKey: 'local.orca-workflow-watch',
     wanted: () => 'auto',
     onChange: () => undefined,
   })
@@ -167,8 +153,6 @@ test('the full log of a run on a paired server is asked of that server; an older
   const asked = calls.find((c) => c[4] === 'watch.log')!
   assert.equal(asked[asked.indexOf('--data') + 1], '{"runId":"r1","engine":"agentprism"}')
   assert.equal(asked[asked.indexOf('--environment') + 1], 'env-mini')
-  old = true
-  await assert.rejects(remote.runLog('env-mini', 'r1'), (e: Error & { code?: string }) => e.code === 'not_supported' && /older Orca Workflow Watch/.test(e.message))
   await assert.rejects(remote.runLog('nowhere', 'r1'), (e: Error & { code?: string }) => e.code === 'invalid_params')
 })
 
@@ -199,5 +183,5 @@ test('the log dialog says what it shows: every line, the last 500 of more, loadi
   // The snapshot's newer lines can grow the count past what the worker said it dropped.
   assert.equal(note({ total: 1650, shown: 500, dropped: 1100 }), 'The last 500 · 1,150 older not kept')
   assert.equal(note({ total: 642, shown: 3, loading: true }), 'Loading…')
-  assert.equal(note({ total: 642, shown: 3, error: 'Mac mini runs an older Orca Workflow Watch, which sends only the latest lines' }), 'Mac mini runs an older Orca Workflow Watch, which sends only the latest lines')
+  assert.equal(note({ total: 642, shown: 3, error: 'could not connect to Mac mini' }), 'could not connect to Mac mini')
 })

@@ -114,7 +114,7 @@ test("a paired server's malformed runs are dropped, and the rest get every field
   const run = normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5, state: 'running', phases: [{ title: 'A' }] })!
   assert.deepEqual(run.agents, { total: 0, running: 0, done: 0, failed: 0 })
   assert.deepEqual(run.phases[0].commands, { running: 0, done: 0, failed: 0 })
-  assert.equal(run.engine, 'odw', 'an older peer sends no engine')
+  assert.equal(run.engine, 'odw', 'a run that names no engine reads as ODW')
   assert.equal(normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5, state: 'exploded' })!.state, 'lost')
 })
 
@@ -154,6 +154,6 @@ test('every checkpoint a run stopped at is kept with how long it waited, the ope
     { title: 'Merge into dev?', since: 20000, until: null },
   ])
   assert.equal(view.state, 'waiting')
-  assert.deepEqual(normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5 })!.checkpoints, [], 'an older peer sends none')
+  assert.deepEqual(normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5 })!.checkpoints, [], 'none sent, none read')
   assert.deepEqual(normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5, checkpoints: [{ since: 'x' }, { title: 'Go?', since: 7, until: 9 }] })!.checkpoints, [{ title: 'Go?', since: 7, until: 9 }])
 })

@@ -158,20 +158,6 @@
   const runKey = (run) => `${run.host || 'local'}:${engineOf(run)}:${run.id}`
   const engineLabel = (id) => ((ui.snap && ui.snap.engines) || []).find((e) => e.id === id)?.label || (id === 'agentprism' ? 'AgentPrism' : 'ODW')
   /** More than one engine among the runs shown: each run then names its engine. */
-  /**
-   * A paired server on an older plugin sends no answer: build ODW's command here, only for a
-   * run id ODW issues, bound to the checkpoint shown. Its runs folder is unknown from here.
-   */
-  function legacyAnswer(run) {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(run.id)) {
-      return { copy: '', how: "This run's id is not one ODW issues, so no command is offered. Answer it with odw approve in a terminal{where}." }
-    }
-    const checkpoint = run.waiting && Number.isSafeInteger(run.waiting.checkpointId) && run.waiting.checkpointId > 0 ? ` --checkpoint ${run.waiting.checkpointId}` : ''
-    return {
-      copy: `odw approve ${run.id}${checkpoint}`,
-      how: 'Run it in a terminal{where} to go on (add --runs-root if its runs are not in ODW’s default folder). To refuse, run it with reject instead of approve.',
-    }
-  }
   /** No process behind the run (lost, or a paused AgentPrism run): an agent shown mid-call is not working. */
   const held = (run) => run.state === 'lost' || (run.state === 'paused' && engineOf(run) === 'agentprism')
   const multiEngine = () => new Set((ui.snap ? ui.snap.runs : []).map(engineOf)).size > 1
@@ -391,7 +377,7 @@
     }
     return { lanes: ends.map((_, k) => ({ key: `p:${k}`, name: '' })), laneOf }
   }
-  /** Every checkpoint the run stopped at, with the one it waits at now even from an older peer. */
+  /** Every checkpoint the run stopped at, with the one it waits at now even when only the run's status names it. */
   function checkpointsOf(run) {
     const list = [...(run.checkpoints || [])]
     if (run.waiting && !list.some((c) => c.until === null)) list.push({ title: run.waiting.title, since: run.waiting.since, until: null })
@@ -460,14 +446,8 @@
         const time = times[run.phases.indexOf(p)]
         dur.dataset.tick = time && time.live ? String(time.from) : ''
         setText(dur, WW.phaseLabel(time))
-        dur.title = !time
-          ? ''
-          : time.approx
-            ? `About ${WW.duration(time.ms)}: this phase was marked without times of its own, so this is the gap from the phase before it ending to the next one starting.`
-            : time.live
-              ? `Running for ${WW.duration(time.ms)}`
-              : `Took ${WW.duration(time.ms)}`
-        band.setAttribute('aria-label', [p.title || 'Agents', n.textContent, cmd.textContent, time ? `${time.live ? 'running for' : 'took'} ${time.approx ? 'about ' : ''}${WW.duration(time.ms)}` : ''].filter(Boolean).join(', '))
+        dur.title = !time ? '' : time.live ? `Running for ${WW.duration(time.ms)}` : `Took ${WW.duration(time.ms)}`
+        band.setAttribute('aria-label', [p.title || 'Agents', n.textContent, cmd.textContent, time ? `${time.live ? 'running for' : 'took'} ${WW.duration(time.ms)}` : ''].filter(Boolean).join(', '))
         band.title = p.detail || ''
         const { lanes, laneOf, commands } = lanesOf(p)
         reconcile(
@@ -734,7 +714,7 @@
     toggle(ask, 'calm', Boolean(resume))
     const askText = ask.querySelector('.ask-text')
     // How to answer a checkpoint is the engine's: a command for ODW, a tool call for AgentPrism.
-    const answer = resume || (run.waiting ? run.answer || legacyAnswer(run) : null)
+    const answer = resume || (run.waiting ? run.answer : null)
     const command = answer ? answer.copy : null
     const askSig = JSON.stringify([asking && run.outcome.text, run.waiting && run.waiting.title, resume && run.error, command, run.host])
     if (!ask.hidden && askText.dataset.sig !== askSig) {
@@ -789,10 +769,9 @@
     const glide = !ticker.hidden && !calm() && !booting() ? new Map([...ticker.children].map((li) => [li.dataset.key, li.getBoundingClientRect().top])) : null
     reconcile(ticker, lines, (l) => l.key, () => createLogLine(true), updateLogLine)
     ticker.hidden = lines.length === 0
-    // Show all: when the run logged more than the ticker shows. A peer on an older plugin sends
-    // no count, and no way to ask for the rest: its runs keep the short log only.
+    // Show all: when the run logged more than the ticker shows.
     const total = run.logCount
-    logbar.hidden = !(total != null && total > run.log.length)
+    logbar.hidden = !(total > run.log.length)
     if (!logbar.hidden) {
       const button = logbar.firstChild
       setText(button, `Show all ${total.toLocaleString()} events`)
@@ -933,7 +912,7 @@
     const shown = st.run || run
     if (!shown) return
     // A gap the snapshot cannot fill (more new lines than it carries) asks the worker again.
-    if (run && st.count != null && run.logCount != null && run.logCount - st.count > run.log.length && !st.error) {
+    if (run && st.count != null && run.logCount - st.count > run.log.length && !st.error) {
       if (st.loading) st.again = true
       else queueMicrotask(() => loadLog(st.key))
     }
@@ -941,7 +920,7 @@
     setText(dlg.querySelector('.ld-title'), shown.workflow)
     setText(dlg.querySelector('.ld-sub'), [hostLabel(shown), shown.subjectLabel, look(shown).word].filter(Boolean).join(' · '))
     const note = dlg.querySelector('.ld-note')
-    const total = shown.logCount != null ? shown.logCount : lines.length
+    const total = Math.max(shown.logCount, lines.length)
     setText(note, WW.logNote({ total, shown: lines.length, dropped: st.dropped, loading: st.loading && !st.lines.length, error: st.error }))
     toggle(note, 'bad', Boolean(st.error))
     const list = dlg.querySelector('.ticker')
@@ -965,7 +944,7 @@
       const data = await orca.plugin.request('watch.log', { runId: run.id, host: run.host || null, engine: engineOf(run) }, { timeoutMs: run.host ? 20000 : 8000 })
       if (ui.log === st) Object.assign(st, { lines: Array.isArray(data.lines) ? data.lines : [], dropped: data.dropped || 0, count, error: null })
     } catch (error) {
-      // An older paired server has no full log to give: the short one stays, with why.
+      // No full log to give (a server out of reach, say): the short one stays, with why.
       if (ui.log === st) Object.assign(st, { error: error.message || String(error), count })
     }
     st.loading = false
@@ -1270,7 +1249,7 @@
     renderHosts()
     const foot = document.getElementById('foot')
     const snap = ui.snap
-    const engines = snap && snap.engines && snap.engines.length ? snap.engines : [{ id: 'odw', label: 'ODW', root: snap ? snap.root : '~/.odw/runs', rootExists: Boolean(snap && snap.rootExists) }]
+    const engines = snap && snap.engines.length ? snap.engines : [{ id: 'odw', label: 'ODW', root: '~/.odw/runs', rootExists: false }]
     const named = engines.length > 1
     if (ui.editing) {
       if (foot.querySelector('input')) return
