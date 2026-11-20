@@ -3,7 +3,7 @@
   "manifestVersion": 2,
   "id": "workflow-watch-orca",
   "name": "Workflow Watch for Orca",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Shows Open Dynamic Workflows and AgentPrism Workflows runs live in the right sidebar, on this computer and on every paired server: phases, every agent as it works, the run's log, tokens, and a notification when a run finishes or waits for you. Read-only. A community plugin, not made or endorsed by Orca or Stably.",
   "author": {
     "name": "Christian Orrala",
