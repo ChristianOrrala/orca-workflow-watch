@@ -142,3 +142,18 @@ test("a question in one project is not taken over by a run of a same-named workf
   const other = { ...base, id: 'b', source: 'app-two', startedAt: 2, outcome: null } as unknown as RunView
   assert.equal(needsYou(asking, [asking, other]), true)
 })
+
+test('every checkpoint a run stopped at is kept with how long it waited, the open one last', () => {
+  const acc = new RunAccumulator()
+  acc.feed({ type: 'checkpoint_requested', checkpointId: 1, title: 'One more review round?', ts: 10 })
+  acc.feed({ type: 'checkpoint_resolved', ts: 12 })
+  acc.feed({ type: 'checkpoint_requested', checkpointId: 2, title: 'Merge into dev?', ts: 20 })
+  const view = buildView({ runId: 'r', status: { state: 'running', pid: 1 }, meta: null }, acc, () => true)
+  assert.deepEqual(view.checkpoints, [
+    { title: 'One more review round?', since: 10000, until: 12000 },
+    { title: 'Merge into dev?', since: 20000, until: null },
+  ])
+  assert.equal(view.state, 'waiting')
+  assert.deepEqual(normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5 })!.checkpoints, [], 'an older peer sends none')
+  assert.deepEqual(normalizeRun({ id: 'r1', workflow: 'wf', startedAt: 5, checkpoints: [{ since: 'x' }, { title: 'Go?', since: 7, until: 9 }] })!.checkpoints, [{ title: 'Go?', since: 7, until: 9 }])
+})

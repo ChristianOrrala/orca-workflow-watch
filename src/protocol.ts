@@ -83,6 +83,11 @@ export interface RunView {
   tokens: { spent: number; budget: number | null }
   log: LogLine[]
   waiting: { title: string; since: number; checkpointId: number | null } | null
+  /**
+   * Every checkpoint the run stopped at, oldest first: when it asked and when it was answered
+   * (null while it still waits). A peer on an older plugin sends none.
+   */
+  checkpoints: Checkpoint[]
   /** How to answer `waiting`, in the engine's own terms; null when the run is not waiting. */
   answer: Answer | null
   error: string | null
@@ -93,6 +98,12 @@ export interface RunView {
    * result has no status.
    */
   outcome: Outcome | null
+}
+
+export interface Checkpoint {
+  title: string
+  since: number
+  until: number | null
 }
 
 export type OutcomeTone = 'ok' | 'attention' | 'bad' | 'neutral'

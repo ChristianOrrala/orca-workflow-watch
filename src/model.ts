@@ -22,6 +22,8 @@ const TEXT_MAX = 240
 
 export type Json = Record<string, unknown>
 
+/** Checkpoints a run view keeps: the flow draws each one as the time it waited. */
+const CHECKPOINTS_KEPT = 24
 const LIVE: ReadonlySet<RunState> = new Set(['running', 'waiting', 'paused'])
 
 export function isLive(state: RunState): boolean {
@@ -196,6 +198,8 @@ export class RunAccumulator {
   private readonly commands = new Map<number, { phase: string; state: AgentState }>()
   readonly log: LogLine[] = []
   waiting: { title: string; since: number; checkpointId: number | null } | null = null
+  /** The checkpoints asked so far, oldest first; the last few only. */
+  readonly checkpoints: { title: string; since: number; until: number | null }[] = []
   lastTs: number | null = null
   private order = 0
 
@@ -317,11 +321,15 @@ export class RunAccumulator {
       case 'checkpoint_requested': {
         const title = str(ev.title) ?? 'a checkpoint'
         this.waiting = { title: clip(title, 160), since: ts, checkpointId: num(ev.checkpointId) }
+        this.checkpoints.push({ title: clip(title, 160), since: ts, until: null })
+        if (this.checkpoints.length > CHECKPOINTS_KEPT) this.checkpoints.shift()
         this.note(ts, `Waiting for you: ${title}`, 'warn')
         break
       }
       case 'checkpoint_resolved': {
         this.waiting = null
+        const open = [...this.checkpoints].reverse().find((c) => c.until === null)
+        if (open) open.until = ts
         const how = ev.approved === false || ev.action === 'reject' ? 'rejected' : 'answered'
         this.note(ts, `Checkpoint ${how}`, 'info')
         break
@@ -529,6 +537,7 @@ export function buildView(files: RunFiles, acc: RunAccumulator, alive: (pid: unk
     tokens: { spent, budget: num(meta?.budgetTotal) },
     log: acc.log.slice(isLive(state) ? -LOG_LIVE : -LOG_ENDED),
     waiting: shownWaiting,
+    checkpoints: acc.checkpoints.map((c) => ({ ...c })),
     answer: null,
     error: acc.error ?? (state === 'lost' ? 'Its worker is gone: the run stopped without saying so.' : null),
     outcome: isLive(state) ? null : outcomeOf(files.result),

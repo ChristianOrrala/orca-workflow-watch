@@ -17,13 +17,13 @@
   --t-figure: 16px; /* the elapsed clock */
   --t-title: 14px; /* panel and card titles */
   --t-body: 13px; /* questions, row titles, sheet heading */
-  --t-meta: 12px; /* secondary lines, beads, ticker, meter, chips */
+  --t-meta: 12px; /* secondary lines, phase bands, ticker, meter, chips */
   --t-micro: 11px; /* rail phase names, timestamps, footer */
   --t-code: 11.5px; /* monospace reads a size larger than sans */
 
   /* Space roles on a 4 px base, tight inside a group and generous between groups. */
   --space-hair: 2px; /* rows in a list, ticker lines */
-  --space-tight: 4px; /* beads, rail segments, a heading to its content */
+  --space-tight: 4px; /* bands, a heading to its content */
   --space-item: 8px; /* siblings in a group, cards in a stack */
   --space-group: 12px; /* groups inside a card, card padding */
   --space-section: 20px; /* above a section heading */
@@ -211,45 +211,6 @@ main > .row + .run.expanded { margin-top: 0; border-top: 0; border-top-left-radi
 .run.expanded .head .glyph, .run.expanded .head h2 { display: none; }
 html.stale .clock .elapsed { opacity: .45; }
 
-/* ── Phase rail ───────────────────────────────────────── */
-/* The current phase takes the room its name needs; the others share what is left. */
-.rail { display: flex; gap: var(--space-tight); }
-.seg { display: flex; flex-direction: column; gap: var(--space-tight); flex: 1 1 0; min-width: 0; }
-.seg.p-active, .seg.p-failed { flex: 1 0 auto; max-width: 55%; }
-.seg .bar { position: relative; height: 5px; border-radius: 3px; background: var(--idle); overflow: hidden; }
-/* A phase that finishes fills from the left, as if the run poured into it. */
-.seg .bar::after {
-  content: ''; position: absolute; inset: 0; border-radius: inherit;
-  background: var(--bar-fill, var(--ok));
-  clip-path: inset(0 100% 0 0 round 3px);
-  transition: clip-path 760ms var(--ease-out);
-}
-.seg.p-done .bar::after { clip-path: inset(0 0 0 0 round 3px); }
-.seg.p-failed .bar::after { --bar-fill: var(--bad); clip-path: inset(0 0 0 0 round 3px); }
-.seg.p-skipped .bar { background: repeating-linear-gradient(90deg, var(--idle) 0 3px, transparent 3px 6px); }
-.seg .name { display: flex; align-items: center; gap: 3px; }
-.seg .name .ico { width: 9px; height: 9px; }
-.seg .name .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.seg.p-done .name .ico { color: var(--ok); }
-.seg.p-failed .name .ico { color: var(--bad); }
-.seg.p-active .bar { background: color-mix(in srgb, var(--c) 55%, transparent); }
-/* The current phase streams: one seamless stripe tile slides by its own period (2 × 13.24 px at 115°). */
-.seg.p-active .bar::before {
-  content: ''; position: absolute; top: 0; bottom: 0; left: -27px; right: 0;
-  background: repeating-linear-gradient(115deg, var(--c) 0 6px, color-mix(in srgb, var(--c) 55%, transparent) 6px 12px);
-  animation: stream 900ms linear infinite;
-}
-.s-waiting .seg.p-active .bar::before { animation-duration: 2.4s; }
-/* Paused: the stripes hold still. Nothing moves until the run is resumed. */
-.s-paused .seg.p-active .bar::before { animation: none; }
-@keyframes stream { to { transform: translateX(26.48px); } }
-.seg .name { font-size: var(--t-micro); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seg.p-active .name { color: var(--fg); font-weight: 600; }
-/* Compact rail: the current phase says where it is, "2/5 Tasks". */
-.rail.dense .seg.p-active .name .label::before { content: attr(data-step) ' '; color: var(--muted); font-weight: 400; }
-.rail.dense .seg:not(.p-active):not(.p-failed) .name { visibility: hidden; }
-.rail.dense:not(:has(.p-active, .p-failed)) .name { display: none; }
-
 /* ── Waiting banner ───────────────────────────────────── */
 .ask {
   display: flex; gap: var(--space-item); align-items: flex-start;
@@ -287,72 +248,80 @@ html.stale .clock .elapsed { opacity: .45; }
 .copy.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
 .copy.done .ico path { stroke-dasharray: 16; stroke-dashoffset: 16; animation: draw 420ms var(--ease-out) forwards; }
 
-/* ── Phases and agent beads ───────────────────────────── */
-.phases { display: flex; flex-direction: column; gap: var(--space-item); }
-.phase { display: flex; flex-direction: column; gap: var(--space-tight); }
-.phase .ph { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-meta); }
-/* A finished phase is one line: its name, then its dots. */
-.phase.past { flex-flow: row wrap; align-items: center; gap: var(--space-tight) var(--space-item); }
-.phase.past .ph { flex: none; }
-/* The dots take the rest of the line, or a line of their own when the heading is long. */
-.phase.past .beads { flex: 1 1 140px; min-width: 0; }
-.phase .ph .t { font-weight: 600; }
-.phase .ph .n { color: var(--muted); font-variant-numeric: tabular-nums; }
-.phase .ph .cmd { color: var(--muted); margin-left: auto; }
-.phase .ph .cmd.bad { color: var(--bad); }
-.phase.past .ph { color: var(--muted); }
-.beads { display: flex; flex-wrap: wrap; gap: var(--space-tight); }
-.bead {
-  --b: var(--idle);
-  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
-  padding: 2px 8px 2px 6px; border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--b) 40%, var(--line));
-  background: color-mix(in srgb, var(--b) 9%, transparent);
-  font-size: var(--t-meta); cursor: pointer; position: relative; overflow: hidden;
-  transition: border-color 300ms, background 300ms, padding 420ms var(--ease-out), gap 420ms var(--ease-out);
+/* ── Flow: the run as a timeline ──────────────────────── */
+/* Time runs left to right. Each phase is a band, each agent a bar in a lane, and the time a
+   checkpoint waited is an amber band across every phase. */
+.flow { --gutter: 72px; --pad: 6px; display: flex; flex-direction: column; gap: var(--space-tight); }
+@container (max-width: 280px) { .flow { --gutter: 58px; } }
+.fbody { position: relative; }
+.bands { display: flex; flex-direction: column; gap: var(--space-tight); }
+.band { border-radius: 6px; background: var(--soft); padding: 3px var(--pad) var(--pad); }
+.band .bh { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-meta); line-height: 18px; min-width: 0; }
+.band .bh .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.band.p-done .bh .t, .band.p-skipped .bh .t { color: var(--muted); }
+.band.p-failed .bh .t { color: var(--bad); }
+.band .bh .n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.band .bh .cmd { color: var(--muted); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.band .bh .cmd.bad { color: var(--bad); }
+.lanes { display: flex; flex-direction: column; gap: 2px; }
+.lanes:empty { display: none; }
+.lane { display: grid; grid-template-columns: var(--gutter) minmax(0, 1fr); align-items: center; height: 12px; }
+.lane .ln { font-size: var(--t-micro); line-height: 12px; color: var(--muted); padding-right: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr { position: relative; height: 100%; }
+.bar {
+  --b: color-mix(in srgb, var(--ok) 72%, transparent);
+  position: absolute; top: 2px; bottom: 2px; min-width: 2px;
+  margin: 0; padding: 0; border: 0; border-radius: 2px;
+  background: var(--b); cursor: pointer;
+  transition: left 1s linear, width 1s linear, background 300ms;
 }
-.bead.enter { animation: pop 320ms var(--ease-out) backwards; }
-.bead:hover { background: color-mix(in srgb, var(--b) 18%, transparent); }
-/* A failed agent is a diamond, so its state never rests on colour alone. */
-.bead.a-failed i { border-radius: 1.5px; transform: rotate(45deg) scale(.86); }
-.bead.sel { border-color: var(--b); box-shadow: 0 0 0 2px color-mix(in srgb, var(--b) 25%, transparent); }
-.bead i { width: 7px; height: 7px; border-radius: 50%; background: var(--b); flex: none; }
-.bead span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; transition: max-width 420ms var(--ease-out), opacity 220ms; }
-/* An agent that just finished: its dot settles with one ring. */
-.bead.just-done i { animation: settle 760ms var(--ease-out); }
-@keyframes settle {
-  from { transform: scale(1.5); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 70%, transparent); }
-  to { transform: scale(1); box-shadow: 0 0 0 7px transparent; }
-}
-.bead.a-running { --b: var(--run); }
-.bead.a-running i { animation: breathe 1.6s ease-in-out infinite; }
-/* A held run (paused, no process behind it) keeps its agents still: nothing moves until it is resumed. */
-.held .bead.a-running i { animation: none; }
-.held .bead.a-running::after { display: none; }
-.bead.a-running::after {
-  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--run) 18%, transparent), transparent);
-  animation: sweep 1.8s ease-in-out infinite;
-}
+/* A thin bar still keeps a fair target. */
+button.bar::before { content: ''; position: absolute; inset: -2px -3px; }
+button.bar:hover { background: color-mix(in srgb, var(--b) 100%, var(--fg) 25%); }
+.bar.enter { animation: grow-in 320ms var(--ease-out); transform-origin: left center; }
+@keyframes grow-in { from { transform: scaleX(0); } }
 @keyframes breathe {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--run) 60%, transparent); }
   50% { box-shadow: 0 0 0 4px transparent; }
 }
-.bead.a-done { --b: var(--ok); }
-.bead.a-failed { --b: var(--bad); }
-.bead.just-failed { animation: shake 420ms ease-in-out; }
-@keyframes shake { 20%, 60% { transform: translateX(-2px); } 40%, 80% { transform: translateX(2px); } }
-/* Past phases, and a busy phase's finished agents: just the dots. */
-.bead.mini { padding: 0; border-color: transparent; background: none; gap: 0; animation: none; overflow: visible; }
-/* An 8 px dot keeps a 16 px target. */
-.bead.mini::before, .phase.past .bead::before { content: ''; position: absolute; inset: -4px; }
-.bead.mini span { max-width: 0; opacity: 0; }
-.bead.mini i { width: 8px; height: 8px; }
-.phase.past .bead { padding: 0; border-color: transparent; background: none; gap: 0; overflow: visible; }
-.phase.past .bead span { max-width: 0; opacity: 0; }
-.phase.past .bead i { width: 8px; height: 8px; }
-.phase.past .beads { gap: 3px; }
-.more { font-size: var(--t-micro); color: var(--muted); align-self: center; }
+.bar.a-running { --b: var(--run); }
+/* The head of a working agent breathes where the run is now. */
+.bar.a-running::after {
+  content: ''; position: absolute; right: -3px; top: 50%; width: 6px; height: 6px; margin-top: -3px;
+  border-radius: 50%; background: var(--run); animation: breathe 1.6s ease-in-out infinite;
+}
+.held .bar.a-running::after { animation: none; }
+/* Failed is striped, cut off is hatched in grey: a state never rests on colour alone. */
+.bar.a-failed { --b: var(--bad); background: repeating-linear-gradient(135deg, var(--bad) 0 3px, color-mix(in srgb, var(--bad) 55%, transparent) 3px 6px); }
+.bar.a-cut { --b: var(--idle); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--fg) 34%, transparent) 0 2px, transparent 2px 4px); }
+.bar.cmdbar { --b: color-mix(in srgb, var(--fg) 26%, transparent); cursor: default; }
+.bar.cmdbar.a-running { --b: color-mix(in srgb, var(--run) 60%, transparent); }
+.bar.cmdbar.a-running::after { display: none; }
+.bar.cmdbar.a-failed { --b: var(--bad); }
+.bar.sel { box-shadow: 0 0 0 2px color-mix(in srgb, var(--b) 45%, transparent), 0 0 0 1px var(--fg); z-index: 1; }
+.bar.just-done { animation: settle-bar 760ms var(--ease-out); }
+@keyframes settle-bar { from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 55%, transparent); } }
+.fover { position: absolute; top: 0; bottom: 0; left: calc(var(--pad) + var(--gutter)); right: var(--pad); pointer-events: none; }
+.gates { position: absolute; inset: 0; }
+.gate {
+  position: absolute; top: 0; bottom: 0; min-width: 2px;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--warn) 70%, transparent);
+  transition: left 1s linear, width 1s linear;
+}
+.gate.open { background: color-mix(in srgb, var(--warn) 18%, transparent); animation: gate-wait 2.4s ease-in-out infinite; }
+@keyframes gate-wait { 50% { background: color-mix(in srgb, var(--warn) 8%, transparent); } }
+.now { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 1px dashed color-mix(in srgb, var(--fg) 40%, transparent); transition: left 1s linear; }
+.faxis {
+  position: relative; height: 14px; margin: 0 var(--pad) 0 calc(var(--pad) + var(--gutter));
+  font-size: var(--t-micro); line-height: 14px; color: var(--muted); font-variant-numeric: tabular-nums;
+  border-top: 1px solid var(--line);
+}
+.faxis .t0 { position: absolute; left: 0; }
+.faxis .t1 { position: absolute; right: 0; }
+.faxis .gls { position: absolute; inset: 0; }
+.faxis .gl { position: absolute; top: 0; color: var(--warn); white-space: nowrap; }
+.fnext { margin: 0; font-size: var(--t-meta); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Agent sheet ──────────────────────────────────────── */
 .sheet {
@@ -442,6 +411,29 @@ html.stale .clock .elapsed { opacity: .45; }
 .row .rt b { font-size: var(--t-body); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .rt .ago { color: var(--muted); font-size: var(--t-micro); white-space: nowrap; margin-left: auto; font-variant-numeric: tabular-nums; }
 .row .rs { color: var(--muted); font-size: var(--t-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A row's run as one metro line: stations for phases, tracks for a few agents, a strip for many. */
+.metro { display: flex; align-items: center; height: 10px; margin-top: 4px; }
+.metro .st { width: 7px; height: 7px; flex: none; border-radius: 50%; border: 1.5px solid var(--idle); background: var(--bg); position: relative; z-index: 1; }
+.row:hover .metro .st, .row.open .metro .st { background: color-mix(in srgb, var(--soft) 100%, var(--bg)); }
+.metro .st.on { border-color: color-mix(in srgb, var(--fg) 62%, transparent); }
+.metro .st.halt { border-color: var(--bad); }
+.metro .ms { --m: var(--idle); flex: 1 1 0; min-width: 8px; height: 100%; position: relative; margin: 0 -1px; }
+.metro .ms::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: var(--m); }
+.metro .ms.m-done { --m: color-mix(in srgb, var(--ok) 70%, transparent); }
+.metro .ms.m-active { --m: var(--run); }
+.metro .ms.m-failed { --m: var(--bad); }
+.metro .ms.m-pending::before, .metro .ms.m-skipped::before { background: repeating-linear-gradient(90deg, var(--idle) 0 2px, transparent 2px 5px); }
+/* A split phase leaves the line, runs as tracks or a strip, and joins it again. */
+.metro .ms.split::before { background: linear-gradient(90deg, var(--m) 0 16%, transparent 16% 84%, var(--m) 84%); }
+.metro .tks { position: absolute; inset: 0 12%; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.metro .tks i { height: 1.5px; border-radius: 1px; background: var(--a); }
+.metro .tcs { position: absolute; inset: 2px 12%; display: flex; gap: 1px; }
+.metro .tcs.dense { gap: 0; }
+.metro .tcs i { flex: 1 1 0; min-width: 0.5px; border-radius: 0.5px; background: var(--a); }
+.metro .a-done { --a: color-mix(in srgb, var(--ok) 75%, transparent); }
+.metro .a-running { --a: var(--run); }
+.metro .a-failed { --a: var(--bad); }
+.metro .a-cut { --a: color-mix(in srgb, var(--fg) 30%, transparent); }
 .barcode { display: flex; align-items: flex-end; gap: 1.5px; height: 18px; flex: none; max-width: 62px; }
 .barcode i { flex: 0 1 2.5px; min-width: 1px; border-radius: 1px; background: color-mix(in srgb, var(--ok) 70%, transparent); min-height: 3px; }
 @container (max-width: 300px) {
@@ -546,17 +538,12 @@ html.stale .clock .elapsed { opacity: .45; }
 /* Reduced motion: nothing travels, spins or loops. State still changes where you can see it,
    by colour and a short fade, so a finished agent or a new question is never missed. */
 @media (prefers-reduced-motion: reduce) {
-  .run::before, .bead.a-running::after { display: none; }
-  .seg.p-active .bar::before, .s-running .glyph svg, .is-running .spin, .beacon.on, .beacon.waiting,
-  .bead.a-running i, .ask svg, .bead.just-failed, .empty .node, .empty .flow, .skeleton,
+  .run::before { display: none; }
+  .bar.a-running::after, .gate.open, .bar.just-done, .s-running .glyph svg, .is-running .spin, .beacon.on, .beacon.waiting,
+  .ask svg, .empty .node, .empty .flow, .skeleton,
   .clock .colon, .celebrate .glyph, .celebrate .glyph path, .copy.done .ico path { animation: none; }
-  .run.enter, .row.enter, .sheet, .ticker li.enter, .bead.enter, .glyph svg.enter { animation-name: fade; animation-duration: 160ms; }
-  .bead.just-done i { animation: fade 300ms; }
-  .bead.enter { animation-delay: 0s !important; }
+  .run.enter, .row.enter, .sheet, .ticker li.enter, .bar.enter, .glyph svg.enter { animation-name: fade; animation-duration: 160ms; }
   .chip.bump b, .chip.c-warn.bump { animation: fade 300ms; }
-  .seg .bar::after { transition: opacity 300ms; }
-  .seg:not(.p-done):not(.p-failed) .bar::after { opacity: 0; clip-path: none; }
-  .seg.p-done .bar::after, .seg.p-failed .bar::after { opacity: 1; clip-path: none; }
-  .bead, .bead span, .row .chev { transition-duration: 0s; }
+  .bar, .gate, .now, .row .chev { transition-duration: 0s; }
 }
 @keyframes fade { from { opacity: 0; } }

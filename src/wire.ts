@@ -1,7 +1,7 @@
 // What a paired server sends is checked before it is used: a run that does not have the shape
 // of a RunView is dropped, and every field the worker or the panel reads gets a safe value. A
 // peer on an older plugin, or a broken one, then costs its own runs only.
-import type { AgentView, Answer, EngineId, LogLine, Outcome, PhaseView, RunView } from './protocol'
+import type { AgentView, Answer, Checkpoint, EngineId, LogLine, Outcome, PhaseView, RunView } from './protocol'
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -62,6 +62,12 @@ function answerOf(v: unknown): Answer | null {
   return copy !== null && how !== null ? { copy, how } : null
 }
 
+function checkpointOf(v: unknown): Checkpoint | null {
+  if (!isObj(v)) return null
+  const since = time(v.since)
+  return since === null ? null : { title: text(v.title, 160) ?? 'a checkpoint', since, until: time(v.until) }
+}
+
 function outcomeOf(v: unknown): Outcome | null {
   if (!isObj(v) || typeof v.status !== 'string') return null
   return { status: v.status.slice(0, 80), tone: oneOf(v.tone, OUTCOME_TONES, 'neutral'), text: text(v.text, 400) }
@@ -98,6 +104,7 @@ export function normalizeRun(v: unknown): RunView | null {
     tokens: { spent: count(tokens.spent), budget: time(tokens.budget) },
     log: (Array.isArray(v.log) ? v.log : []).map(logOf).filter((l): l is LogLine => l !== null),
     waiting,
+    checkpoints: (Array.isArray(v.checkpoints) ? v.checkpoints : []).slice(-24).map(checkpointOf).filter((c): c is Checkpoint => c !== null),
     answer: answerOf(v.answer),
     error: text(v.error, 600),
     outcome: outcomeOf(v.outcome),

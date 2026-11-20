@@ -243,7 +243,7 @@
     return String(n)
   }
   /**
-   * A label for a bead. `review:correctness` → `correctness`: the phase already says what it
+   * A label for an agent. `review:correctness` → `correctness`: the phase already says what it
    * is. Longer ones read as words: `review:conformance:3:1` → `conformance 3`, the attempt
    * or round shown only past the first (`implement:3:2` → `implement 3 #2`).
    */
@@ -342,6 +342,282 @@
     })
   }
 
+  // ── The flow: a run as a timeline ─────────────────────
+  // Time runs left to right. Each phase is a band and each agent a bar in a lane. A phase that
+  // repeats a few roles (implement, review:spec, fix) gets a lane per role, so a loop reads as a
+  // loop; a phase of different agents gets a lane each; a crowd shares packed lanes. The time a
+  // checkpoint waited for you is an amber band across every phase.
+  const LANES_MAX = 8
+  const roleOf = (label) => label.replace(/(:\d+)+$/, '')
+  /** A role's short name: its last part when no other role ends the same, else its first part. */
+  function roleNames(roles) {
+    const parts = roles.map((r) => r.split(':'))
+    return parts.map((p, i) => {
+      if (parts.filter((q) => q[q.length - 1] === p[p.length - 1]).length === 1) return p[p.length - 1]
+      if (parts.filter((q) => q[0] === p[0]).length === 1) return p[0]
+      return roles[i]
+    })
+  }
+  const commandsOf = (p) => p.commands.running + p.commands.done + p.commands.failed
+  /** Where a phase's agents sit: its lanes, and each agent's lane. */
+  function lanesOf(p) {
+    const agents = p.agents
+    const laneOf = new Map()
+    if (!agents.length) {
+      return commandsOf(p) && p.startedAt ? { lanes: [{ key: 'cmd', name: 'commands' }], laneOf, commands: true } : { lanes: [], laneOf }
+    }
+    const roles = [...new Set(agents.map((a) => roleOf(a.label)))]
+    if (agents.length > 4 && roles.length <= 6 && roles.length <= Math.max(2, agents.length / 2)) {
+      for (const a of agents) laneOf.set(a.id, roles.indexOf(roleOf(a.label)))
+      const names = roleNames(roles)
+      return { lanes: roles.map((r, i) => ({ key: `r:${r}`, name: names[i] })), laneOf }
+    }
+    if (agents.length <= LANES_MAX) {
+      agents.forEach((a, i) => laneOf.set(a.id, i))
+      return { lanes: agents.map((a) => ({ key: `a:${a.id}`, name: shortLabel(a.label) })), laneOf }
+    }
+    // A crowd: each agent takes the first lane free since its last agent ended.
+    const ends = []
+    for (const a of [...agents].sort((x, y) => x.startedAt - y.startedAt)) {
+      let k = ends.findIndex((end) => end <= a.startedAt)
+      if (k < 0 && ends.length < LANES_MAX) k = ends.push(0) - 1
+      if (k < 0) k = ends.indexOf(Math.min(...ends))
+      ends[k] = a.endedAt ?? Infinity
+      laneOf.set(a.id, k)
+    }
+    return { lanes: ends.map((_, k) => ({ key: `p:${k}`, name: '' })), laneOf }
+  }
+  /** Every checkpoint the run stopped at, with the one it waits at now even from an older peer. */
+  function checkpointsOf(run) {
+    const list = [...(run.checkpoints || [])]
+    if (run.waiting && !list.some((c) => c.until === null)) list.push({ title: run.waiting.title, since: run.waiting.since, until: null })
+    return list
+  }
+
+  function createFlow() {
+    const flow = h('div', 'flow')
+    flow.setAttribute('role', 'group')
+    flow.setAttribute('aria-label', 'Timeline of the run')
+    const body = h('div', 'fbody')
+    const over = h('div', 'fover')
+    over.setAttribute('aria-hidden', 'true')
+    over.append(h('div', 'gates'), h('i', 'now'))
+    body.append(h('div', 'bands'), over)
+    const axis = h('div', 'faxis')
+    axis.setAttribute('aria-hidden', 'true')
+    axis.append(h('span', 't0', '0:00'), h('div', 'gls'), h('span', 't1'))
+    flow.append(body, axis, h('p', 'fnext'))
+    return flow
+  }
+  function createBand() {
+    const band = h('div', 'band')
+    band.setAttribute('role', 'group')
+    const bh = h('div', 'bh')
+    bh.append(h('span', 't'), h('span', 'n'), h('span', 'cmd'))
+    band.append(bh, h('div', 'lanes'))
+    return band
+  }
+  function createLane() {
+    const lane = h('div', 'lane')
+    lane.append(h('span', 'ln'), h('div', 'tr'))
+    return lane
+  }
+
+  function updateFlow(flow, run, key) {
+    const live = isLive(run.state)
+    const shown = run.phases.filter((p) => p.state !== 'pending' || p.agents.length || commandsOf(p))
+    const next = run.phases.filter((p) => !shown.includes(p) && p.title)
+    flow.hidden = shown.length === 0
+    if (flow.hidden) return
+    flow.dataset.run = key
+    flow.dataset.t0 = String(run.startedAt)
+    // A live run's flow runs up to now; a paused or ended one stops where it stopped.
+    flow.dataset.t1 = live && run.state !== 'paused' ? '' : String(run.endedAt ?? run.updatedAt)
+    const selected = ui.sheet && ui.sheet.key === key ? ui.sheet.agentId : null
+    const cut = held(run) || !live
+    reconcile(
+      flow.querySelector('.bands'),
+      shown,
+      (p) => `b:${p.title}`,
+      createBand,
+      (band, p) => {
+        setState(band, 'p-', p.state)
+        const [t, n, cmd] = band.firstChild.children
+        setText(t, p.title || 'Agents')
+        const total = p.agents.length + p.hiddenAgents
+        const settled = p.agents.filter((a) => a.state !== 'running').length + p.hiddenAgents
+        setText(n, p.state === 'skipped' ? 'skipped' : total === 0 ? '' : p.state === 'active' ? `${settled} of ${total}` : `${total} agent${total === 1 ? '' : 's'}`)
+        const c = p.commands
+        const cmds = commandsOf(p)
+        setText(cmd, cmds ? `${cmds} command${cmds === 1 ? '' : 's'}${c.failed ? ` · ${c.failed} failed` : c.running ? ' · running' : ' · passed'}` : '')
+        toggle(cmd, 'bad', c.failed > 0)
+        band.setAttribute('aria-label', [p.title || 'Agents', n.textContent, cmd.textContent].filter(Boolean).join(', '))
+        band.title = p.detail || ''
+        const { lanes, laneOf, commands } = lanesOf(p)
+        reconcile(
+          band.lastChild,
+          lanes,
+          (l) => l.key,
+          createLane,
+          (lane, l) => {
+            const index = lanes.indexOf(l)
+            setText(lane.firstChild, l.name)
+            lane.firstChild.title = l.name
+            const track = lane.lastChild
+            if (commands) {
+              if (!track.firstChild) track.append(h('i', 'bar cmdbar'))
+              const bar = track.firstChild
+              bar.dataset.s = String(p.startedAt)
+              bar.dataset.e = p.endedAt != null ? String(p.endedAt) : ''
+              setState(bar, 'a-', p.state === 'active' && !cut ? 'running' : c.failed ? 'failed' : 'done')
+              return
+            }
+            reconcile(
+              track,
+              p.agents.filter((a) => laneOf.get(a.id) === index),
+              (a) => `a${a.id}`,
+              () => {
+                const bar = enter(h('button', 'bar'))
+                bar.type = 'button'
+                return bar
+              },
+              (bar, a) => {
+                if (bar.dataset.state === 'running' && a.state === 'done') flash(bar, 'just-done', 800)
+                bar.dataset.state = a.state
+                bar.dataset.agent = String(a.id)
+                // An agent still "running" in a run with no process behind it was cut off.
+                setState(bar, 'a-', a.state === 'running' && cut ? 'cut' : a.state)
+                toggle(bar, 'sel', selected === a.id)
+                bar.dataset.s = String(a.startedAt)
+                bar.dataset.e = a.endedAt != null ? String(a.endedAt) : ''
+                const took = a.endedAt ? span(a.endedAt - a.startedAt) : null
+                const word = a.state === 'running' && cut ? 'cut off' : WORDS[a.state] || a.state
+                bar.title = `${a.label} — ${word}${took ? ` · ${took}` : ''}${a.adapter ? ` · ${a.adapter}` : ''}${a.error ? `\n${a.error}` : ''}`
+                bar.setAttribute('aria-label', `${shortLabel(a.label)}, ${word}${took ? `, took ${took}` : ''}`)
+              },
+            )
+          },
+        )
+      },
+    )
+    const gates = checkpointsOf(run)
+    reconcile(
+      flow.querySelector('.gates'),
+      gates,
+      (g) => `g:${g.since}`,
+      () => h('i', 'gate'),
+      (gate, g) => {
+        gate.dataset.s = String(g.since)
+        gate.dataset.e = g.until != null ? String(g.until) : ''
+        toggle(gate, 'open', g.until == null && Boolean(run.waiting))
+      },
+    )
+    reconcile(
+      flow.querySelector('.gls'),
+      gates,
+      (g) => `l:${g.since}`,
+      () => h('span', 'gl'),
+      (label, g) => {
+        label.dataset.s = String(g.since)
+        label.dataset.e = g.until != null ? String(g.until) : ''
+        setText(label, g.until == null && run.waiting ? 'waiting for you' : g.until != null ? `waited ${span(g.until - g.since)}` : '')
+      },
+    )
+    const nextText = next.length ? `Next: ${next.map((p) => p.title).join(' → ')}` : ''
+    setText(flow.querySelector('.fnext'), nextText)
+    flow.querySelector('.fnext').hidden = !nextText
+    placeFlow(flow, Date.now())
+  }
+
+  /**
+   * Puts every bar, checkpoint and label where its time falls. A live flow keeps a little room
+   * past now and refits every second, so the run grows to the right without leaving the card.
+   */
+  function placeFlow(flow, now) {
+    if (flow.hidden) return
+    const t0 = Number(flow.dataset.t0)
+    const open = !flow.dataset.t1
+    const end = open ? now : Number(flow.dataset.t1)
+    const span = open ? Math.max(10000, end - t0) * 1.04 : Math.max(1000, end - t0)
+    const frac = (t) => Math.min(1, Math.max(0, (t - t0) / span))
+    const place = (node) => {
+      const s = frac(Number(node.dataset.s))
+      const e = frac(node.dataset.e ? Number(node.dataset.e) : end)
+      const left = `${(s * 100).toFixed(3)}%`
+      const width = `${(Math.max(0, e - s) * 100).toFixed(3)}%`
+      if (node.style.left !== left) node.style.left = left
+      if (node.style.width !== width) node.style.width = width
+    }
+    for (const node of flow.querySelectorAll('.bar, .gate')) place(node)
+    const nowLine = flow.querySelector('.now')
+    nowLine.hidden = !open
+    if (open) nowLine.style.left = `${(frac(now) * 100).toFixed(3)}%`
+    setText(flow.querySelector('.t1'), clock(span))
+    // A checkpoint's label sits under its middle, when it clears the axis ends and the others.
+    const width = flow.querySelector('.gls').clientWidth || 200
+    // The axis ends hold 0:00 and the span; a label slides inward rather than cover them.
+    const lo = 34, hi = width - 48
+    const taken = []
+    // The open wait first, then the longest: the time that mattered most keeps its label.
+    const waited = (l) => (l.dataset.e ? Number(l.dataset.e) : Infinity) - Number(l.dataset.s)
+    const labels = [...flow.querySelectorAll('.gl')].sort((a, b) => waited(b) - waited(a))
+    for (const label of labels) {
+      const s = frac(Number(label.dataset.s))
+      const e = frac(label.dataset.e ? Number(label.dataset.e) : end)
+      const mid = ((s + e) / 2) * width
+      const half = label.textContent.length * 2.9 + 4
+      const x0 = Math.max(lo, Math.min(hi - half * 2, mid - half))
+      const fits = label.textContent && x0 + half * 2 <= hi && !taken.some(([a, b]) => x0 < b && x0 + half * 2 > a)
+      label.hidden = !fits
+      if (fits) {
+        taken.push([x0, x0 + half * 2])
+        label.style.left = `${x0}px`
+      }
+    }
+  }
+  function placeFlows(all) {
+    const now = Date.now()
+    for (const flow of document.querySelectorAll('.flow')) if (all || !flow.dataset.t1) placeFlow(flow, now)
+  }
+
+  // ── The metro line: a finished run in one line ────────
+  /** A history row's run as stations and tracks: a phase of a few agents splits into tracks, a big one is a strip. */
+  function drawMetro(el, run) {
+    const shown = run.phases.filter((p) => p.title !== '' || p.agents.length)
+    el.hidden = shown.length === 0
+    const sig = JSON.stringify([run.state, shown.map((p) => [p.state, p.agents.map((a) => a.state[0]).join('')])])
+    if (el.dataset.sig === sig) return
+    el.dataset.sig = sig
+    const ran = (p) => p.state !== 'pending' && p.state !== 'skipped'
+    const lastRan = shown.map(ran).lastIndexOf(true)
+    const halted = run.state === 'stopped' || run.state === 'failed' || run.state === 'lost'
+    const kids = []
+    const live = isLive(run.state)
+    const agentCls = (a) => `a-${a.state === 'running' && !live ? 'cut' : a.state}`
+    shown.forEach((p, i) => {
+      kids.push(h('i', i === 0 || ran(shown[i - 1]) ? 'st on' : 'st'))
+      const state = p.state === 'active' && !live ? 'failed' : p.state
+      const seg = h('span', `ms m-${state}`)
+      const n = p.agents.length
+      if (n >= 2 && n <= 4) {
+        seg.classList.add('split')
+        const tracks = h('span', 'tks')
+        for (const a of p.agents) tracks.append(h('i', agentCls(a)))
+        seg.append(tracks)
+      } else if (n > 4) {
+        seg.classList.add('split')
+        const strip = h('span', n > 16 ? 'tcs dense' : 'tcs')
+        for (const a of p.agents) strip.append(h('i', agentCls(a)))
+        seg.append(strip)
+      }
+      kids.push(seg)
+    })
+    kids.push(h('i', lastRan === shown.length - 1 && !halted ? 'st on' : 'st'))
+    // Where a stopped or failed run ended: the station after the last phase that ran.
+    if (halted && lastRan >= 0) kids[(lastRan + 1) * 2].className = 'st halt'
+    el.replaceChildren(...kids)
+  }
+
   // ── Run card ───────────────────────────────────────────
   function createCard() {
     const card = enter(h('article', 'run'))
@@ -353,13 +629,12 @@
     clk.append(h('span', 'elapsed'), h('span', 'word'))
     head.append(glyph, titles, clk)
     const desc = h('p', 'desc')
-    const rail = h('div', 'rail')
     const ask = h('div', 'ask')
     ask.setAttribute('role', 'group')
     ask.setAttribute('aria-label', 'The run is asking you')
     ask.append(icon('waiting'), h('div', 'ask-text'))
     const lost = h('div', 'lost-note')
-    const phases = h('div', 'phases')
+    const flow = createFlow()
     const sheet = h('div', 'sheet-slot')
     const ticker = h('ul', 'ticker')
     const meter = h('div', 'meter')
@@ -368,11 +643,11 @@
     const txt = h('span', 'txt')
     txt.append(document.createTextNode(''), h('b'), document.createTextNode(''))
     meter.append(track, txt)
-    card.append(head, desc, rail, ask, lost, phases, sheet, ticker, meter)
+    card.append(head, desc, ask, lost, flow, sheet, ticker, meter)
     card.addEventListener('click', (event) => {
-      const bead = event.target.closest('.bead, .show-agent')
-      if (bead) {
-        openSheet(card.dataset.run, Number(bead.dataset.agent))
+      const bar = event.target.closest('button.bar, .show-agent')
+      if (bar) {
+        openSheet(card.dataset.run, Number(bar.dataset.agent))
         return
       }
       if (event.target.closest('.x')) closeSheet(true)
@@ -393,7 +668,7 @@
     toggle(card, 'celebrate', ui.celebrate.has(key))
     toggle(card, 'mourn', ui.mourn.has(key))
     const live = isLive(run.state)
-    const [head, desc, rail, ask, lost, phases, sheetSlot, ticker, meter] = card.children
+    const [head, desc, ask, lost, flow, sheetSlot, ticker, meter] = card.children
     setIcon(head.children[0], seen.icon)
     setText(head.querySelector('h2'), run.workflow)
     const sub = head.querySelector('.sub')
@@ -420,32 +695,6 @@
 
     setText(desc, run.description ?? '')
     desc.hidden = !run.description || !live
-
-    // The rail: one segment per phase, the active one striped.
-    const shown = run.phases.filter((p) => p.title !== '' || p.agents.length)
-    rail.hidden = shown.length === 0
-    reconcile(
-      rail,
-      shown,
-      (p) => p.title,
-      () => {
-        const seg = h('div', 'seg')
-        const name = h('div', 'name')
-        name.append(iconSpan(null), h('span', 'label'))
-        seg.append(h('div', 'bar'), name)
-        return seg
-      },
-      (seg, p) => {
-        setState(seg, 'p-', p.state)
-        const [ico, label] = seg.lastChild.children
-        setIcon(ico, p.state === 'done' ? 'done' : p.state === 'failed' ? 'failed' : p.state === 'skipped' ? 'skipped' : null)
-        setText(label, p.title || 'Agents')
-        label.dataset.step = `${shown.indexOf(p) + 1}/${shown.length}`
-        seg.title = `${p.title || 'Agents'}: ${p.state}${p.detail ? ` — ${p.detail}` : ''}`
-      },
-    )
-    rail.setAttribute('aria-label', `Phases: ${shown.map((p) => `${p.title || 'Agents'} ${p.state}`).join(', ')}`)
-    rail.setAttribute('role', 'img')
 
     const asking = !run.waiting && seen.cls === 'asking' && run.outcome
     // A paused run its engine can resume (AgentPrism's) shows the call that resumes it.
@@ -500,74 +749,7 @@
       }
     }
 
-    // Phases with agents: the current one as labelled beads, earlier ones as dots.
-    const active = run.phases.find((p) => p.state === 'active')
-    const withAgents = run.phases.filter((p) => p.agents.length || p.hiddenAgents || p.commands.running + p.commands.done + p.commands.failed)
-    reconcile(
-      phases,
-      withAgents,
-      (p) => p.title,
-      () => {
-        const block = h('div', 'phase')
-        block.setAttribute('role', 'group')
-        const ph = h('div', 'ph')
-        ph.append(h('span', 't'), h('span', 'n'), h('span', 'cmd'))
-        block.append(ph, h('div', 'beads'))
-        return block
-      },
-      (block, p) => {
-        const past = live ? p !== active && p.state !== 'active' : p.agents.length > 12
-        toggle(block, 'past', past)
-        // A busy phase keeps its working and failed agents as labelled beads, the rest as dots.
-        const compact = !past && p.agents.length > 12
-        const [t, n, cmd] = block.firstChild.children
-        setText(t, p.title || 'Agents')
-        block.setAttribute('aria-label', p.title || 'Agents')
-        const total = p.agents.length + p.hiddenAgents
-        const done = p.agents.filter((a) => a.state !== 'running').length + p.hiddenAgents
-        setText(n, total === 0 ? '' : p.state === 'active' ? `${done} of ${total}` : `${total} agent${total === 1 ? '' : 's'}`)
-        const c = p.commands
-        const cmds = c.running + c.done + c.failed
-        const verdict = c.failed ? ` · ${c.failed} failed` : c.running ? ' · running' : ' · passed'
-        setText(cmd, cmds ? `${cmds} command${cmds === 1 ? '' : 's'}${verdict}` : '')
-        toggle(cmd, 'bad', c.failed > 0)
-        const beads = block.lastChild
-        let arriving = 0
-        reconcile(
-          beads,
-          p.agents,
-          (a) => `a${a.id}`,
-          () => {
-            const bead = enter(h('button', 'bead'))
-            bead.type = 'button'
-            bead.append(h('i'), h('span'))
-            // Agents that start together arrive as a list, a beat apart (at most 270 ms in all).
-            bead.style.animationDelay = `${Math.min(arriving++, 6) * 45}ms`
-            return bead
-          },
-          (bead, a) => {
-            if (bead.dataset.state === 'running' && a.state === 'done') flash(bead, 'just-done', 800)
-            if (bead.dataset.state === 'running' && a.state === 'failed') flash(bead, 'just-failed', 500)
-            bead.dataset.state = a.state
-            bead.dataset.agent = String(a.id)
-            setState(bead, 'a-', a.state)
-            toggle(bead, 'mini', compact && a.state === 'done' && !(ui.sheet && ui.sheet.key === key && ui.sheet.agentId === a.id))
-            toggle(bead, 'sel', ui.sheet && ui.sheet.key === key && ui.sheet.agentId === a.id)
-            setText(bead.lastChild, shortLabel(a.label))
-            const took = a.endedAt ? ` · ${span(a.endedAt - a.startedAt)}` : ''
-            bead.title = `${a.label} — ${a.state}${took}${a.adapter ? ` · ${a.adapter}` : ''}${a.error ? `\n${a.error}` : ''}`
-            bead.setAttribute('aria-label', `${shortLabel(a.label)}, ${WORDS[a.state] || a.state}${took ? `, took ${span(a.endedAt - a.startedAt)}` : ''}`)
-          },
-        )
-        let more = beads.querySelector('.more')
-        if (p.hiddenAgents) {
-          if (!more) more = beads.appendChild(h('span', 'more'))
-          setText(more, `+${p.hiddenAgents} more`)
-          beads.appendChild(more)
-        } else more?.remove()
-      },
-    )
-    phases.hidden = withAgents.length === 0
+    updateFlow(flow, run, key)
 
     renderSheet(sheetSlot, run)
 
@@ -657,12 +839,12 @@
     }
     render()
   }
-  /** Closes the agent sheet; `refocus` puts the keyboard back on the bead it came from. */
+  /** Closes the agent sheet; `refocus` puts the keyboard back on the bar it came from. */
   function closeSheet(refocus) {
     const was = ui.sheet
     ui.sheet = null
     void render().then(() => {
-      if (refocus && was) document.getElementById(`card-${was.key}`)?.querySelector(`.bead[data-agent="${was.agentId}"]`)?.focus()
+      if (refocus && was) document.getElementById(`card-${was.key}`)?.querySelector(`button.bar[data-agent="${was.agentId}"]`)?.focus()
     })
   }
   function findAgent(run, id) {
@@ -756,10 +938,10 @@
     const main = h('div', 'rm')
     const rt = h('div', 'rt')
     rt.append(h('b'), h('span', 'ago'))
-    main.append(rt, h('div', 'rs'))
-    const barcode = h('div', 'barcode')
-    barcode.setAttribute('aria-hidden', 'true')
-    row.append(glyph, main, barcode)
+    const metro = h('div', 'metro')
+    metro.setAttribute('aria-hidden', 'true')
+    main.append(rt, h('div', 'rs'), metro)
+    row.append(glyph, main)
     row.addEventListener('click', () => {
       const id = row.dataset.run
       if (ui.open.has(id)) ui.open.delete(id)
@@ -779,7 +961,7 @@
     row.setAttribute('aria-expanded', ui.open.has(key) ? 'true' : 'false')
     row.setAttribute('aria-controls', `card-${key}`)
     setMorph(row, vtName('r', key), ui.prevCards.has(key) ? 'vt-row vt-filing' : 'vt-row')
-    const [glyph, main, barcode] = row.children
+    const [glyph, main] = row.children
     setIcon(glyph, seen.icon)
     setText(main.querySelector('b'), run.workflow)
     const agoEl = main.querySelector('.ago')
@@ -796,13 +978,8 @@
     if (run.dry) parts.push('dry')
     setText(main.querySelector('.rs'), parts.join(' · '))
     row.title = `${run.workflow} · ${run.id}${run.hostName ? ` · ${run.hostName}` : ''}${run.error ? `\n${run.error}` : run.outcome && run.outcome.text ? `\n${run.outcome.text}` : ''}`
-    // A barcode of the whole run: its agents in start order, as tall as they took.
-    const agents = run.phases.flatMap((p) => p.agents)
-    drawBarcode(
-      barcode,
-      agents.map((a) => ({ took: (a.endedAt ?? a.startedAt) - a.startedAt, failed: a.state === 'failed' })),
-      agents.map((a) => `${a.id}${a.state[0]}`).join(','),
-    )
+    // The whole run as a metro line: its phases as stations, its agents as tracks.
+    drawMetro(main.querySelector('.metro'), run)
   }
 
   /** A fold: back-to-back runs of one workflow that all ended well, as one row that opens. */
@@ -1009,20 +1186,6 @@
   }
 
   // ── The page ───────────────────────────────────────────
-  /**
-   * A rail names every phase while the names fit. When one would be cut, only the current
-   * (or failed) phase keeps its name; the others keep theirs as tooltips.
-   */
-  function fitRails() {
-    for (const rail of document.querySelectorAll('.rail')) {
-      if (rail.hidden) continue
-      // Measure with every name showing: a compact rail hides some, which would read as fitting.
-      rail.classList.remove('dense')
-      const tight = [...rail.querySelectorAll('.seg .name .label')].some((n) => n.scrollWidth > n.clientWidth + 1)
-      toggle(rail, 'dense', rail.children.length > 5 || tight)
-    }
-  }
-
   /** What the list shows, in order: live cards, then history (folds, rows, expanded cards). */
   function plan() {
     const snap = ui.snap
@@ -1167,7 +1330,6 @@
       },
     )
     renderFoot()
-    fitRails()
     watchOffscreen(list)
     ui.prevCards = new Set(items.filter((it) => it.kind === 'card' && !it.expanded).map((it) => runKey(it.run)))
   }
@@ -1189,7 +1351,7 @@
       ui.observed.delete(card)
     }
   }
-  window.addEventListener('resize', fitRails)
+  window.addEventListener('resize', () => placeFlows(true))
 
   /** The ending beat of a run: a sheen when it went well, one red wash when it did not. */
   function playMoment(key, moment) {
@@ -1267,6 +1429,7 @@
       if (node.dataset.since) setClock(node, now - Number(node.dataset.since))
     }
     for (const node of document.querySelectorAll('[data-ago]')) setText(node, ago(Number(node.dataset.ago)))
+    placeFlows(false)
     if (ui.sheet) {
       const run = findRun(ui.sheet.key)
       const agent = run && findAgent(run, ui.sheet.agentId)
