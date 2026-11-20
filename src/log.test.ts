@@ -4,7 +4,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { buildView, LOG_KEEP, RunAccumulator } from './model'
-import { RemoteHosts, type CliResult } from './remote'
 import { normalizeLog, normalizeRun } from './wire'
 
 const lib = createRequire(import.meta.url)('../panel/lib.js') as {
@@ -131,29 +130,6 @@ test('a peer’s full log is checked line by line and capped at the newest 500',
   assert.equal(log?.lines[0].text, 'l20')
   assert.equal(log?.dropped, 3 + 20, 'the lines cut are counted as dropped; junk is not')
   assert.equal(normalizeLog({ nope: true }, 'r1'), null)
-})
-
-test('the full log of a run on a paired server is asked of that server', async () => {
-  const ok = (result: unknown): CliResult => ({ code: 0, stdout: JSON.stringify({ ok: true, result }), stderr: '' })
-  const calls: string[][] = []
-  const remote = new RemoteHosts({
-    run: async (args) => {
-      calls.push(args)
-      if (args[0] === 'environment') return ok({ environments: [{ id: 'env-mini', name: 'Mac mini' }] })
-      if (args[4] === 'watch.log') return ok({ result: { runId: 'r1', lines: [{ ts: 1, text: 'a', tone: 'warn' }], dropped: 0 } })
-      return ok({ result: { runs: [] } })
-    },
-    pluginKey: 'local.workflow-watch-orca',
-    wanted: () => 'auto',
-    onChange: () => undefined,
-  })
-  await remote.tick(1_000_000)
-  const log = await remote.runLog('env-mini', 'r1', 'agentprism')
-  assert.deepEqual(log.lines, [{ ts: 1, text: 'a', tone: 'warn' }])
-  const asked = calls.find((c) => c[4] === 'watch.log')!
-  assert.equal(asked[asked.indexOf('--data') + 1], '{"runId":"r1","engine":"agentprism"}')
-  assert.equal(asked[asked.indexOf('--environment') + 1], 'env-mini')
-  await assert.rejects(remote.runLog('nowhere', 'r1'), (e: Error & { code?: string }) => e.code === 'invalid_params')
 })
 
 test('the open log takes the snapshot’s newer lines after the fetched ones, without doubling any', () => {

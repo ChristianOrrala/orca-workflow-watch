@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "result": {
+    "plugins": [
+      { "pluginKey": "christianorrala.workflow-watch-orca", "name": "Workflow Watch for Orca", "version": "0.4.0", "publisher": "christianorrala", "status": "running", "isDev": false, "execution": "trusted-worker" },
+      { "pluginKey": "mswdev.fleet-monitor", "name": "Fleet Monitor", "version": "1.3.1", "publisher": "mswdev", "status": "running", "isDev": false },
+      { "pluginKey": "someone.workflow-watch-orca-extra", "name": "Not this one", "publisher": "someone", "status": "running", "isDev": false },
+      { "pluginKey": "local.umber-calm", "name": "Umber Calm", "publisher": "local", "status": "idle", "isDev": true }
+    ]
+  },
+  "_meta": { "runtimeId": "5337aa66-0925-4046-936f-3543c450ec82" }
+}

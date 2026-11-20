@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "result": {
+    "pluginKey": "christianorrala.workflow-watch-orca",
+    "lines": [
+      { "ts": 1795208526624, "level": "info", "line": "paired servers: Work" },
+      { "ts": 1795208586703, "level": "info", "line": "paired servers: Work" }
+    ],
+    "cursor": "a1b2c3d4:42"
+  }
+}

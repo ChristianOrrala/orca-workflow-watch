@@ -32,7 +32,7 @@ Open a finished run and every phase shows how long it took. The agents' bars sho
 
 ![Recent runs from a MacBook Pro and a Mac mini in one list.](assets/paired.png)
 
-Runs from this computer and from your paired Orca servers share one list, each named by the computer it ran on. Each server runs the plugin too; [Install](#install) says how. A desktop notification fires when a run finishes, fails, stops answering or waits for you, even with the panel closed.
+Runs from this computer and from your paired Orca servers share one list, each named by the computer it ran on. Each server runs the plugin too, installed the same way as here. A desktop notification fires when a run finishes, fails, stops answering or waits for you, even with the panel closed.
 
 ## Install
 
@@ -46,16 +46,14 @@ orca plugin update christianorrala.workflow-watch-orca   # later
 
 If Orca answers `approval_required`, run the command it prints with `--approve <fingerprint>` before continuing.
 
-**With paired Orca servers:** the plugin must also run on each server, loaded there as a development folder (key `local.workflow-watch-orca`), because the worker asks a paired server through `orca plugin dev request`, which reaches only development plugins (Orca refuses it for installed ones). On each server (or from your computer, with `--environment <server>` and the server's absolute path):
+**With paired Orca servers:** install the plugin on each server too, from the same catalog. No development folder is needed. From your own computer, `--environment` does it on the server:
 
 ```sh
-git clone https://github.com/ChristianOrrala/orca-workflow-watch.git
-orca plugin dev load ./orca-workflow-watch --json                          # prints the approval
-orca plugin dev load ./orca-workflow-watch --approve <fingerprint> --json
-# later: git pull, then orca plugin dev reload ./orca-workflow-watch
+orca plugin catalog add ChristianOrrala/agents --environment <server>
+orca plugin install christianorrala.workflow-watch-orca --environment <server>
 ```
 
-The panel then shows a chip for each paired server under the runs; one without the plugin reads "not set up" in the header. Your own computer can use either a catalog install or a development folder. Every computer runs the same version: update them together.
+The panel then shows a chip for each paired server under the runs. One without the plugin, or with it turned off, reads "not set up" in the header. One whose plugin has stopped sending runs (its worker stopped, or it runs a version older than 0.4.0) reads "not updating". Every computer runs the same version, so update them together. A copy loaded from a development folder works too, and can also show its agents' prompts and full logs (see [Paired servers](#paired-servers)).
 
 ## How it works
 
@@ -67,7 +65,7 @@ The panel then shows a chip for each paired server under the runs; one without t
 - **Checkpoints stand out:** a run waiting at `checkpoint()` turns amber and shows how to answer it, with a Copy button (the worker copies on the computer you're at): ODW's `odw approve <run>` command, or for AgentPrism the `resume` call to give its workflow tool from an agent working in that project.
 - **Click any agent:** it opens a sheet with what it was asked, what it answered (or its latest output while it runs), its stderr, adapter, time and tokens.
 - **History rows:** finished runs, each drawn as a metro line: its phases as stations, its agents as tracks. Click a row to open the full card. Back-to-back runs of one workflow that all ended well fold into one row (`review-swarm ×7`) with a bar per run, and it opens; a failure or a question keeps its own row, and a question a newer run took over reads "Asked".
-- **Paired servers:** with paired servers, each row and card names the computer it ran on, and a chip for each computer sits under the list. A server out of reach reads "unreachable" in the header, and one without the plugin reads "not set up".
+- **Paired servers:** with paired servers, each row and card names the computer it ran on, and a chip for each computer sits under the list. A server out of reach reads "unreachable" in the header, one without the plugin reads "not set up", and one whose runs stopped coming for 30 s reads "not updating" (its runs leave the list until they come back). Everything in a run's card comes across: its phases and their times, its agents with their state, times and tokens, its checkpoints, and its last log lines. What an agent was asked and answered, and a run's full log, stay on the server; the panel says so where they would show.
 - **Stale data shows:** with a live run on screen and no word from the worker for 30 s, the clocks dim and a "no updates" chip appears (the worker posts at least every 10 s).
 - **Status bar and notifications:** a `Workflows` item reports running and waiting runs, and a desktop notification fires when a run finishes, fails, stops answering or waits for you. The status bar item keeps the worker running, so the notifications still arrive with the panel closed.
 
@@ -82,6 +80,15 @@ Each engine is a run source (`src/sources/`, the `RunSource` interface in `types
 
 Adding an engine is one more `RunSource` in the worker's list.
 
+### Paired servers
+
+A plugin worker runs on the computer whose Orca loaded it, and the plugin API does not reach a paired server. The Orca CLI does, with `--environment`. Orca's `plugin dev request` reaches development folders only, so the runs travel through the plugin's log, which `orca plugin logs` reads for an installed copy too (`src/beacon.ts`):
+
+- **Each computer publishes its own runs** as log lines that start with `WWATCH1`. Each run is one record, named by a hash of its contents, in short keys with times relative to its start. A record longer than a line is cut into numbered pieces, and every line stays under 4,096 characters (Orca cuts a line at 8,192 without saying so). A manifest line lists the records that make up the computer's runs now. Only what changed is written, at most every 2 s: a live run's update costs its own record and a manifest. When nothing changes, a short heartbeat goes out every 10 s.
+- **Each desktop reads them**: it lists the paired servers (`orca environment list`), finds the plugin's key on each one (`orca plugin list --environment <id>`: any key with the id `workflow-watch-orca`, from a catalog or a folder), and reads its log (`orca plugin logs <key> --environment <id>`) every 3 s while that server has a live run, else every 10 s. It joins only the records it holds whole, and takes the newest manifest. A server whose beacon has not moved for 3 intervals (30 s) is stale.
+- **The 200-line budget:** Orca keeps a plugin's newest 200 log lines and answers all of them on every read. The writer writes every record and the manifest again before 90 of its own lines have gone by, and one manifest names at most 60 pieces (the oldest finished runs are left out first; live runs always stay). So a reader always finds every record of the newest manifest. It also keeps the plugin's log readable: an idle computer writes one short line every 10 s, and the worker's own messages are written once per change, not every minute.
+- **Too big to publish:** an agent's prompt and answer and a run's full log (up to 500 lines) would crowd the 200 lines out, and no CLI call can carry a request to an installed plugin. Clicking an agent of a run on a server shows its state, times and tokens and says that the rest is on that server; "Show all" shows the lines the run carries and says the same. When the server's copy is a development folder, the desktop still asks it for them with `orca plugin dev request`, as before.
+
 ### Settings
 
 | Setting | Default | |
@@ -95,7 +102,7 @@ Adding an engine is one more `RunSource` in the worker's list.
 
 `trusted-worker` (its worker is Node and reads the runs folders), `settings:own`, `notifications:show`. It opens no network connection itself and no terminal. It does run local programs:
 
-- **The Orca CLI**, to ask each paired Orca server for its runs (a snapshot every few seconds while one is live) and for an agent's detail when you open one. Set "Paired servers to watch" to `off` and it asks none.
+- **The Orca CLI**, to read each paired Orca server's plugin list and this plugin's log there (every few seconds while a run is live), and, from a server's development folder, an agent's detail when you open one. Set "Paired servers to watch" to `off` and it reads none. It also writes this computer's runs into its own plugin log, for the desktops paired to it ([Paired servers](#paired-servers)).
 - **The clipboard program** (`pbcopy`, `clip`, `wl-copy`, `xclip` or `xsel`) when you press Copy, with the text on its input.
 - **`ps`**, on macOS, to check that a run's recorded process is still the same one (ODW's own check).
 

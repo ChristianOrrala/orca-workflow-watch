@@ -122,10 +122,20 @@ export interface Outcome {
 export interface HostStatus {
   id: string
   name: string
-  /** `no-plugin`: the server answers but has no Workflow Watch for Orca loaded to ask. */
-  state: 'connecting' | 'ok' | 'offline' | 'no-plugin' | 'error'
+  /**
+   * `no-plugin`: the server answers but has no Workflow Watch for Orca running.
+   * `stale`: it has one, but its runs stopped coming (its worker stopped, or it is older than 0.4).
+   */
+  state: 'connecting' | 'ok' | 'stale' | 'offline' | 'no-plugin' | 'error'
   error: string | null
+  /** When its runs last came in (this computer's clock), or null. */
   lastSeen: number | null
+  /**
+   * True when the server's copy can be asked for an agent's prompt and answer or a run's full log
+   * (a development folder there, reached through `orca plugin dev request`). An installed copy
+   * publishes its runs only: those stay on the server.
+   */
+  details: boolean
 }
 
 /** One engine this computer watches, for the footer and the empty state. */

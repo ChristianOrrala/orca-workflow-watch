@@ -3,8 +3,9 @@
 // what changed.
 //
 // Both engines keep their runs as plain files, so watching needs no engine server: a file
-// watcher wakes the worker, a slow poll catches what a watcher misses. Paired servers are asked
-// through the Orca CLI (see ./remote), each answering from its own copy of this plugin. The
+// watcher wakes the worker, a slow poll catches what a watcher misses. The worker also writes
+// this computer's runs into its plugin log as beacon lines (./beacon), and reads each paired
+// server's the same way through the Orca CLI (./remote). The
 // status bar item keeps the worker running while the plugin is enabled, so finished runs and
 // checkpoints still notify with the panel closed.
 import type { OrcaWorkerApi } from 'orca/worker'
@@ -13,6 +14,7 @@ import { execFileSync } from 'node:child_process'
 import { hostname, platform } from 'node:os'
 import { isLive } from './model'
 import { cliRunner, findOrcaCli, RemoteHosts } from './remote'
+import { BeaconWriter } from './beacon'
 import type { EngineId, EngineInfo, RunState, RunView, Snapshot } from './protocol'
 import { isAgentId } from './model'
 import type { RunSource } from './sources/types'
@@ -22,15 +24,8 @@ import { expandHome } from './sources/paths'
 
 const DEFAULT_ROOT = '~/.odw/runs'
 const DEFAULT_AGENTPRISM_ROOT = '~/.agentprism/workflows'
-/** The manifest's id. */
+/** The manifest's id: a server's copy is found by it, whatever its key (catalog or folder). */
 const PLUGIN_ID = 'workflow-watch-orca'
-/**
- * The key a paired server's copy answers to. It is not this copy's own key: the worker API does
- * not expose that, and it would not help, because `orca plugin dev request` reaches only
- * development plugins, so every server loads this plugin from a folder and Orca names a folder's
- * copy `local.<id>`, whatever catalog this computer installed it from.
- */
-const PLUGIN_KEY = `local.${PLUGIN_ID}`
 const STATUS_ITEM = 'workflows'
 const FAST_MS = 1000
 const SLOW_MS = 5000
@@ -114,13 +109,20 @@ export default function activate(orca: OrcaWorkerApi): void {
   let remoteTimer: ReturnType<typeof setInterval> | null = null
   let debounce: ReturnType<typeof setTimeout> | null = null
 
+  // Every line this worker logs goes through here, so the beacon can count them (./beacon).
+  const beacon = new BeaconWriter({ write: (line) => orca.log(line) })
+  const say = (message: string) => {
+    beacon.noteLine()
+    orca.log(message)
+  }
+
   let run = cliRunner(findOrcaCli(null))
   const remote = new RemoteHosts({
     run: (args, timeoutMs) => run(args, timeoutMs),
-    pluginKey: PLUGIN_KEY,
+    pluginId: PLUGIN_ID,
     wanted: () => remotesWanted,
     onChange: () => publish(),
-    log: (message) => orca.log(message),
+    log: say,
   })
 
   // Each engine's last good scan: one that fails keeps its runs on screen, and says why.
@@ -129,7 +131,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   /** Every engine's runs on this computer, live first, then newest. */
   function scanLocal(): Snapshot {
     const runs: RunView[] = []
-    const log = (message: string) => orca.log(message)
+    const log = say
     const engines: EngineInfo[] = []
     for (const source of sources) {
       let error: string | null = null
@@ -237,9 +239,7 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   /** This computer's runs and every paired server's, as one snapshot for the panel. */
   function publish(): Snapshot {
-    const remoteRuns = remote
-      .snapshots()
-      .flatMap(({ env, snapshot: s }) => s.runs.map((r) => ({ ...r, host: env.id, hostName: env.name })))
+    const remoteRuns = remote.snapshots().flatMap(({ env, runs }) => runs.map((r) => ({ ...r, host: env.id, hostName: env.name })))
     // Live runs from every host, then the newest finished ones across all of them.
     const all = [...local.runs, ...remoteRuns].sort(byLiveThenNewest)
     let finished = 0
@@ -284,9 +284,15 @@ export default function activate(orca: OrcaWorkerApi): void {
       local = { ...local, scannedAt: Date.now(), error: (error as Error).message }
     }
     try {
+      // This computer's own runs, for the desktops it is paired to.
+      beacon.update(local.runs)
+    } catch (error) {
+      say(`publishing to paired desktops failed: ${(error as Error).message}`)
+    }
+    try {
       return publish()
     } catch (error) {
-      orca.log(`publishing failed: ${(error as Error).message}`)
+      say(`publishing failed: ${(error as Error).message}`)
       return snapshot ?? local
     }
   }
@@ -322,7 +328,7 @@ export default function activate(orca: OrcaWorkerApi): void {
         })
         watchers.push(w)
       } catch (error) {
-        orca.log(`watching ${source.root} fell back to polling: ${(error as Error).message}`)
+        say(`watching ${source.root} fell back to polling: ${(error as Error).message}`)
       }
     }
   }
@@ -374,7 +380,15 @@ export default function activate(orca: OrcaWorkerApi): void {
     refresh()
     schedule()
     // Each server keeps its own pace inside RemoteHosts; this only wakes it.
-    remoteTimer = setInterval(() => void remote.tick().catch((error) => orca.log(`paired servers: ${(error as Error).message}`)), REMOTE_TICK_MS)
+    remoteTimer = setInterval(() => {
+      // A change held back by the beacon's pace goes out here, and so does its heartbeat.
+      try {
+        beacon.tick()
+      } catch (error) {
+        say(`publishing to paired desktops failed: ${(error as Error).message}`)
+      }
+      void remote.tick().catch((error) => say(`paired servers: ${(error as Error).message}`))
+    }, REMOTE_TICK_MS)
   })()
 
   orca.settings.onDidChange(() => {

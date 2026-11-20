@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "result": {
+    "plugins": [
+      { "pluginKey": "mswdev.fleet-monitor", "name": "Fleet Monitor", "publisher": "mswdev", "status": "running", "isDev": false },
+      { "pluginKey": "christianorrala.workflow-watch-orca-x", "name": "Not this one", "publisher": "christianorrala", "status": "running", "isDev": false }
+    ]
+  }
+}

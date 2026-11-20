@@ -29,7 +29,7 @@ const settings = { runsRoot: opt('root', '~/.odw/runs'), agentprismRoot: opt('ag
 if (opt('remote', null)) {
   process.env.FAKE_ORCA_ROOT = opt('remote', null)
   process.env.FAKE_ORCA_NAME = opt('remote-name', 'Mac mini')
-  // --remote-key none: a server without the plugin.
+  // --remote-key none: a server without the plugin; local.workflow-watch-orca: a development folder there.
   if (opt('remote-key', null)) process.env.FAKE_ORCA_KEY = opt('remote-key', null)
   settings.orcaCli = join(here, 'fake-orca')
 }

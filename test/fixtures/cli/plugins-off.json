@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "result": {
+    "plugins": [
+      { "pluginKey": "christianorrala.workflow-watch-orca", "name": "Workflow Watch for Orca", "publisher": "christianorrala", "status": "disabled", "isDev": false }
+    ]
+  }
+}

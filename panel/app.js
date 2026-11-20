@@ -164,6 +164,15 @@
   const findRun = (key) => (ui.snap ? ui.snap.runs.find((r) => runKey(r) === key) : null)
   const multiHost = () => Boolean(ui.snap && ui.snap.hosts && ui.snap.hosts.length)
   const hostLabel = (run) => run.hostName || (ui.snap && ui.snap.localName) || 'This computer'
+  /**
+   * What stays on the server a run ran on: an installed copy there publishes its runs only, so an
+   * agent's prompt and answer and the full log are read there. Null when they can be fetched.
+   */
+  const staysOn = (run) => {
+    if (!run || !run.host) return null
+    const host = ((ui.snap && ui.snap.hosts) || []).find((x) => x.id === run.host)
+    return host && !host.details ? hostLabel(run) : null
+  }
 
   const LIVE = new Set(['running', 'waiting', 'paused'])
   const isLive = (state) => LIVE.has(state)
@@ -912,7 +921,7 @@
     const shown = st.run || run
     if (!shown) return
     // A gap the snapshot cannot fill (more new lines than it carries) asks the worker again.
-    if (run && st.count != null && run.logCount - st.count > run.log.length && !st.error) {
+    if (run && st.count != null && run.logCount - st.count > run.log.length && !st.error && !st.note) {
       if (st.loading) st.again = true
       else queueMicrotask(() => loadLog(st.key))
     }
@@ -921,7 +930,7 @@
     setText(dlg.querySelector('.ld-sub'), [hostLabel(shown), shown.subjectLabel, look(shown).word].filter(Boolean).join(' · '))
     const note = dlg.querySelector('.ld-note')
     const total = Math.max(shown.logCount, lines.length)
-    setText(note, WW.logNote({ total, shown: lines.length, dropped: st.dropped, loading: st.loading && !st.lines.length, error: st.error }))
+    setText(note, st.note || WW.logNote({ total, shown: lines.length, dropped: st.dropped, loading: st.loading && !st.lines.length, error: st.error }))
     toggle(note, 'bad', Boolean(st.error))
     const list = dlg.querySelector('.ticker')
     // Opening adds hundreds of lines at once: those arrive still; later ones slide in.
@@ -936,6 +945,13 @@
     if (!st || st.key !== key || !run) return
     if (st.loading) {
       st.again = true
+      return
+    }
+    const where = staysOn(run)
+    if (where) {
+      // Nothing to fetch: the dialog shows the lines the snapshot carries, and says where the rest are.
+      Object.assign(st, { lines: [], dropped: 0, count: run.logCount, error: null, note: `The last ${run.log.length} of ${run.logCount.toLocaleString('en-US')} events. The rest stay on ${where}: open Workflows there to read them all.` })
+      renderLog()
       return
     }
     st.loading = true
@@ -968,6 +984,11 @@
   async function loadSheet() {
     const sheet = ui.sheet
     if (!sheet) return
+    const where = staysOn(findRun(sheet.key))
+    if (where) {
+      Object.assign(sheet, { data: null, error: null, loading: false, note: `What it was asked and answered stays on ${where}: open Workflows there to read it.` })
+      return render()
+    }
     try {
       const data = await orca.plugin.request('watch.agent', { runId: sheet.runId, agentId: sheet.agentId, host: sheet.host, engine: sheet.engine }, { timeoutMs: sheet.host ? 20000 : 8000 })
       if (ui.sheet === sheet) Object.assign(sheet, { data, error: null, loading: false })
@@ -1012,7 +1033,7 @@
       }
     }
     sheet.seenState = agent.state
-    const key = JSON.stringify([agent, sheet.loading, sheet.error, sheet.data && sheet.data.reply && sheet.data.reply.length])
+    const key = JSON.stringify([agent, sheet.loading, sheet.error, sheet.note, sheet.data && sheet.data.reply && sheet.data.reply.length])
     if (slot.dataset.key === key) return
     slot.dataset.key = key
     const hadFocus = slot.contains(document.activeElement)
@@ -1044,7 +1065,8 @@
     fact('attempts', agent.attempts && agent.attempts > 1 ? String(agent.attempts) : null)
     box.append(sh, facts)
     if (agent.error) box.append(h('div', 'err', agent.error))
-    if (sheet.loading && !sheet.data) box.append(h('div', 'skeleton'))
+    if (sheet.note) box.append(h('div', 'note', sheet.note))
+    else if (sheet.loading && !sheet.data) box.append(h('div', 'skeleton'))
     else if (sheet.error) box.append(h('div', 'err', sheet.error))
     else if (sheet.data) {
       if (sheet.data.prompt) box.append(h('div', 'lbl', 'Asked'), h('pre', null, sheet.data.prompt))
@@ -1213,10 +1235,18 @@
   const HOST_WORDS = {
     ok: 'connected',
     connecting: 'connecting…',
+    stale: 'no updates',
     offline: 'unreachable',
-    'no-plugin': 'Workflow Watch for Orca not loaded there',
+    'no-plugin': 'Workflow Watch for Orca not set up there',
     error: 'error',
   }
+  /** What a host chip's tooltip adds about getting its runs. */
+  const hostHelp = (item) =>
+    item.state === 'no-plugin'
+      ? `\nInstall Workflow Watch for Orca there from the ChristianOrrala/agents catalog: orca plugin install christianorrala.workflow-watch-orca --environment "${item.name}"`
+      : item.state === 'ok' && !item.details
+        ? '\nIts agents’ prompts and answers and its full logs stay there.'
+        : ''
   function renderHosts() {
     const bar = document.getElementById('hosts')
     if (!bar) return
@@ -1239,7 +1269,7 @@
         const count = snap.runs.filter((r) => (r.host || 'local') === item.id).length
         chip.title = item.local
           ? `${item.name} (this computer) · ${count} run${count === 1 ? '' : 's'}`
-          : `${item.name} · ${HOST_WORDS[item.state] || item.state}${item.state === 'ok' ? ` · ${count} run${count === 1 ? '' : 's'}` : ''}${item.error ? `\n${item.error}` : ''}${item.state === 'no-plugin' ? '\nLoad Workflow Watch for Orca there as a development plugin (orca plugin dev load <folder>) to see its runs here.' : ''}`
+          : `${item.name} · ${HOST_WORDS[item.state] || item.state}${item.state === 'ok' ? ` · ${count} run${count === 1 ? '' : 's'}` : ''}${item.error ? `\n${item.error}` : ''}${hostHelp(item)}`
       },
     )
   }
@@ -1420,6 +1450,7 @@
     const hosts = snap && snap.hosts ? snap.hosts : []
     const unreachable = hosts.filter((x) => x.state === 'offline' || x.state === 'error')
     const unset = hosts.filter((x) => x.state === 'no-plugin')
+    const quietHosts = hosts.filter((x) => x.state === 'stale')
     const today = runs.filter((r) => !isLive(r.state) && r.endedAt && now - r.endedAt < 864e5).length
     const chips = []
     if (running) chips.push(['c-run', running, ' running', ''])
@@ -1427,7 +1458,8 @@
     if (paused) chips.push(['', paused, ' paused', 'Nothing moves in a paused run until it is resumed.'])
     if (today && !running && !waiting && !paused) chips.push(['', today, ' today', ''])
     if (unreachable.length) chips.push(['c-quiet', unreachable.length, ' unreachable', unreachable.map((x) => x.name).join(', ')])
-    if (unset.length) chips.push(['c-quiet', unset.length, ' not set up', `Workflow Watch for Orca is not loaded as a development plugin on ${unset.map((x) => x.name).join(', ')}`])
+    if (unset.length) chips.push(['c-quiet', unset.length, ' not set up', `Workflow Watch for Orca is not installed or not turned on on ${unset.map((x) => x.name).join(', ')}`])
+    if (quietHosts.length) chips.push(['c-quiet', quietHosts.length, ' not updating', quietHosts.map((x) => `${x.name}: ${x.error || 'no updates'}`).join('\n')])
     if (ui.stale) chips.push(['c-warn c-quiet', null, 'no updates', 'The watcher has not posted for over 30 seconds, so these runs may have moved on.'])
     const tally = document.getElementById('tally')
     const tallySig = JSON.stringify(chips)
