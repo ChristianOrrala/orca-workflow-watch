@@ -1,9 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
   "manifestVersion": 2,
-  "id": "odw-watch",
-  "name": "Workflow Watch",
-  "version": "0.1.4",
+  "id": "orca-workflow-watch",
+  "name": "Orca Workflow Watch",
+  "version": "0.2.0",
   "description": "Watch Open Dynamic Workflows and AgentPrism Workflows runs live in Orca's sidebar, on this computer and on every paired Orca server: phases, every agent as it works, the run's log, tokens, and a nudge when a run finishes or waits for you.",
   "engines": {
     "orca": ">=1.4.248"
@@ -23,19 +23,19 @@
     ],
     "commands": [
       {
-        "id": "odw.toggleSidebar",
-        "title": "Workflow Watch: Show or hide the sidebar",
+        "id": "workflowWatch.toggleSidebar",
+        "title": "Orca Workflow Watch: Show or hide the sidebar",
         "action": "sidebar.right.toggle"
       }
     ],
     "statusBarItems": [
       {
-        "id": "odw",
+        "id": "workflows",
         "text": "Workflows",
         "icon": "activity",
         "tone": "neutral",
-        "tooltip": "Workflow Watch",
-        "command": "odw.toggleSidebar"
+        "tooltip": "Orca Workflow Watch",
+        "command": "workflowWatch.toggleSidebar"
       }
     ],
     "settings": [
