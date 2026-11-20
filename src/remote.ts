@@ -72,7 +72,14 @@ export function classify(envelope: CliEnvelope): { state: HostStatus['state']; e
   const code = envelope.error?.code ?? 'error'
   const message = envelope.error?.message ?? 'no answer'
   const requestCode = envelope.error?.data?.requestCode
-  if (/not.?(found|loaded|installed)|unknown plugin|no plugin|approval|consent|Plugin service is not available/i.test(message) || code === 'approval_required' || requestCode === 'unknown_method')
+  // Orca reaches a paired server's plugin only when it is loaded there as a development plugin;
+  // one installed from a catalog or Git answers plugin_not_found.
+  if (
+    /not.{0,4}(found|loaded|installed)|loaded development plugin|unknown plugin|no plugin|approval|consent|Plugin service is not available/i.test(message) ||
+    code === 'approval_required' ||
+    code === 'plugin_not_found' ||
+    requestCode === 'unknown_method'
+  )
     return { state: 'no-plugin', error: message }
   if (/unreachable|offline|connect|timed? ?out|ECONN|socket|closed|unavailable/i.test(`${code} ${message}`)) return { state: 'offline', error: message }
   return { state: 'error', error: message }

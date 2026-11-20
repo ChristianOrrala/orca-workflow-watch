@@ -74,3 +74,8 @@ test('failures are sorted into what the panel can say', () => {
   assert.equal(classify({ error: { code: 'plugin_request_failed', message: 'x', data: { requestCode: 'unknown_method' } } }).state, 'no-plugin')
   assert.equal(classify({ error: { code: 'weird', message: 'something else' } }).state, 'error')
 })
+
+test('a server whose plugin is installed rather than loaded for development reads as not set up', () => {
+  const answer = { ok: false, error: { code: 'plugin_not_found', message: 'That is not a loaded development plugin.' } }
+  assert.equal(classify(answer as never).state, 'no-plugin')
+})
