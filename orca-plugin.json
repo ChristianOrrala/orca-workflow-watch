@@ -3,7 +3,7 @@
   "manifestVersion": 2,
   "id": "odw-watch",
   "name": "Workflow Watch",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Watch Open Dynamic Workflows and AgentPrism Workflows runs live in Orca's sidebar, on this computer and on every paired Orca server: phases, every agent as it works, the run's log, tokens, and a nudge when a run finishes or waits for you.",
   "engines": {
     "orca": ">=1.4.248"
