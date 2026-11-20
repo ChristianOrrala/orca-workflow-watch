@@ -9,14 +9,16 @@
 //
 // `orca plugin dev request` reaches development folders only. It stays for the two things a
 // beacon cannot hold, an agent's prompt and answer and a run's full log, and is used only when
-// the server's copy is a development folder.
+// the server's copy is a development folder. From an installed copy, "Show all" on the server's
+// newest run reads the last 50 events its beacon publishes (the tail); any other run's full log
+// stays there.
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentDetail, EngineId, HostStatus, RunLog, RunView } from './protocol'
 import { normalizeLog } from './wire'
-import { assembleRuns, assessBeacon, BEACON_INTERVAL_MS, emptyTracker, readBeaconLog, runKey, type BeaconTracker } from './beacon'
+import { assembleRuns, assembleTail, assessBeacon, BEACON_INTERVAL_MS, emptyTracker, readBeaconLog, runKey, type BeaconTracker, type RunTail } from './beacon'
 import { isLive } from './model'
 
 export interface CliResult {
@@ -144,6 +146,8 @@ interface Source {
   tracker: BeaconTracker
   /** Runs decoded from the server's records, by record hash. */
   cache: Map<string, RunView>
+  /** The newest run's last events, as the server's beacon published them. */
+  tail: RunTail | null
   quietReads: number
 }
 
@@ -248,7 +252,7 @@ export class RemoteHosts {
       }
       this.sources.set(env.id, {
         env,
-        status: { id: env.id, name: env.name, state: 'connecting', error: null, lastSeen: null, details: false },
+        status: { id: env.id, name: env.name, state: 'connecting', error: null, lastSeen: null, details: false, tail: null },
         runs: [],
         next: 0,
         failures: 0,
@@ -258,6 +262,7 @@ export class RemoteHosts {
         keysAt: 0,
         tracker: emptyTracker(),
         cache: new Map(),
+        tail: null,
         quietReads: 0,
       })
       changed = true
@@ -266,7 +271,9 @@ export class RemoteHosts {
   }
 
   private setStatus(source: Source, patch: Partial<HostStatus>): void {
-    const next = { ...source.status, ...patch }
+    // A tail is read only while the server's runs are: with them gone, so is "Show all" from it.
+    if (patch.state && patch.state !== 'ok') source.tail = null
+    const next = { ...source.status, ...patch, tail: source.tail?.key ?? null }
     if (next.state !== source.status.state && next.state !== 'ok') this.log(`${source.env.name}: ${next.state}${next.error ? `: ${next.error}` : ''}`)
     source.status = next
   }
@@ -338,6 +345,7 @@ export class RemoteHosts {
         const { runs, missing } = assembleRuns(log, source.cache, previous)
         if (missing) this.log(`${source.env.name}: ${missing} run record(s) not whole yet; showing the last ones`)
         source.runs = runs
+        source.tail = assembleTail(log, source.tail)
         source.quietReads = 0
         this.setStatus(source, { state: 'ok', error: null, lastSeen: read, details: copy.isDev })
       } else {
@@ -401,8 +409,16 @@ export class RemoteHosts {
     return detail
   }
 
-  /** One run's full log from the server it runs on (a development folder there only). */
+  /**
+   * One run's full log from the server it runs on: from a development folder there, its every
+   * kept line; from an installed copy, the newest run's last events, the tail its beacon carries.
+   */
   async runLog(hostId: string, runId: string, engine: EngineId = 'odw'): Promise<RunLog> {
+    const known = this.sources.get(hostId)
+    const copy = known?.copies[known.copyIndex % Math.max(1, known.copies.length)]
+    const tail = known?.tail
+    if (known && !copy?.isDev && tail && tail.key === `${engine}:${runId}`)
+      return { runId, lines: tail.lines.map((l) => ({ ...l })), dropped: Math.max(0, tail.total - tail.lines.length) }
     const { source, key } = this.devCopy(hostId)
     const envelope = await this.request(source, key, 'watch.log', engine === 'odw' ? { runId } : { runId, engine })
     const log = envelope.ok ? normalizeLog((envelope.result as { result?: unknown } | undefined)?.result, runId) : null

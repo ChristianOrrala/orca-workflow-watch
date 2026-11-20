@@ -173,6 +173,12 @@
     const host = ((ui.snap && ui.snap.hosts) || []).find((x) => x.id === run.host)
     return host && !host.details ? hostLabel(run) : null
   }
+  /** A paired server's newest run, whose last events its beacon carries (0.4.1): "Show all" reads those. */
+  const hasTail = (run) => {
+    if (!run || !run.host) return false
+    const host = ((ui.snap && ui.snap.hosts) || []).find((x) => x.id === run.host)
+    return Boolean(host && host.tail && host.tail === `${engineOf(run)}:${run.id}`)
+  }
 
   const LIVE = new Set(['running', 'waiting', 'paused'])
   const isLive = (state) => LIVE.has(state)
@@ -930,7 +936,7 @@
     setText(dlg.querySelector('.ld-sub'), [hostLabel(shown), shown.subjectLabel, look(shown).word].filter(Boolean).join(' · '))
     const note = dlg.querySelector('.ld-note')
     const total = Math.max(shown.logCount, lines.length)
-    setText(note, st.note || WW.logNote({ total, shown: lines.length, dropped: st.dropped, loading: st.loading && !st.lines.length, error: st.error }))
+    setText(note, st.note || WW.logNote({ total, shown: lines.length, dropped: st.dropped, loading: st.loading && !st.lines.length, error: st.error, stays: st.stays || null }))
     toggle(note, 'bad', Boolean(st.error))
     const list = dlg.querySelector('.ticker')
     // Opening adds hundreds of lines at once: those arrive still; later ones slide in.
@@ -948,9 +954,11 @@
       return
     }
     const where = staysOn(run)
-    if (where) {
+    // The newest run there is read from the last events its beacon carries; the rest stay there.
+    if (where && hasTail(run)) st.stays = where
+    else if (where) {
       // Nothing to fetch: the dialog shows the lines the snapshot carries, and says where the rest are.
-      Object.assign(st, { lines: [], dropped: 0, count: run.logCount, error: null, note: `The last ${run.log.length} of ${run.logCount.toLocaleString('en-US')} events. The rest stay on ${where}: open Workflows there to read them all.` })
+      Object.assign(st, { lines: [], dropped: 0, count: run.logCount, error: null, stays: null, note: `The last ${run.log.length} of ${run.logCount.toLocaleString('en-US')} events. The rest stay on ${where}: open Workflows there to read them all.` })
       renderLog()
       return
     }

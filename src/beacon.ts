@@ -16,15 +16,28 @@
 //   (one per worker start) and a sequence number. A heartbeat line (`h`) moves the sequence on
 //   when nothing changed, at least every BEACON_INTERVAL_MS, so a reader can tell a quiet computer
 //   from a stopped worker;
+// - the newest run (the one started last, live or ended) also gets its last TAIL_EVENTS log
+//   events, for "Show all" on a paired desktop: a tail record of its own line kind
+//   (`t <hash> <i> <n> <piece>`, at most TAIL_CHUNKS_MAX pieces) that the manifest names in `tl`.
+//   A reader older than 0.4.1 skips both;
 // - only what changed is written: a live run's update costs its own record and a manifest, not
 //   the whole history. Every record and the manifest are written again before REWRITE_LINES of
-//   this worker's lines have gone by, and the total a manifest names is capped at SET_CHUNKS_MAX,
-//   so a reader always finds every record of the newest manifest inside the 200 lines.
+//   this worker's lines have gone by, and the total a manifest names is capped at SET_CHUNKS_MAX
+//   run pieces plus TAIL_CHUNKS_MAX tail pieces, so a reader always finds every record of the
+//   newest manifest inside the 200 lines.
 //
-// Not published: what an agent was asked and answered, and a run's full log (up to 500 lines).
-// They are too big to keep in 200 lines, and no Orca CLI call carries a request to an installed
-// plugin. A paired server whose copy is a development folder still answers them on demand
-// through `orca plugin dev request`; any other shows where to read them.
+// The budget: a record the newest complete manifest names was written fewer than REWRITE_LINES
+// lines before the write that ended in that manifest began, and one write is at most
+// SET_CHUNKS_MAX + TAIL_CHUNKS_MAX + 1 lines (pieces, then the manifest). So everything the reader
+// needs sits in the newest REWRITE_LINES + SET_CHUNKS_MAX + TAIL_CHUNKS_MAX + 1 = 151 lines, and
+// 49 of Orca's 200 stay free for lines Orca adds itself. The tail's 6 pieces came out of
+// SET_CHUNKS_MAX (60 before 0.4.1), so that sum did not move.
+//
+// Not published: what an agent was asked and answered, and a run's full log (up to 500 lines)
+// beyond the newest run's tail. They are too big to keep in 200 lines, and no Orca CLI call
+// carries a request to an installed plugin. A paired server whose copy is a development folder
+// still answers them on demand through `orca plugin dev request`; any other shows where to read
+// them.
 import { createHash, randomBytes } from 'node:crypto'
 import type { AgentView, LogLine, PhaseView, RunView } from './protocol'
 import { isLive } from './model'
@@ -52,8 +65,14 @@ export const REWRITE_LINES = 90
 export const REWRITE_MS = 10 * 60_000
 /** The most pieces one run may take; a bigger one is trimmed first (see encodeRun). */
 export const RUN_CHUNKS_MAX = 8
-/** The most pieces one manifest may name: the oldest finished runs are left out past it. */
-export const SET_CHUNKS_MAX = 60
+/** The most run pieces one manifest may name: the oldest finished runs are left out past it. */
+export const SET_CHUNKS_MAX = 54
+/** The newest run's log events published as its tail. */
+export const TAIL_EVENTS = 50
+/** The most pieces the tail may take: 50 events of 400 characters fit in 6 (see encodeTail). */
+export const TAIL_CHUNKS_MAX = 6
+/** What Orca's 200 lines must keep free for lines Orca adds to the log itself. */
+export const ORCA_SPARE_LINES = 49
 /** The most runs one manifest may name. */
 export const SET_RUNS_MAX = 60
 const PIECE_MAX = BEACON_MAX_CHARS - 64
@@ -256,6 +275,79 @@ export function chunkLine(hash: string, index: number, count: number, piece: str
   return `${BEACON_PREFIX}c ${hash} ${index} ${count} ${piece}`
 }
 
+// ── The newest run's tail ──────────────────────────────
+
+/** The newest run's last events, as a reader gets them back. */
+export interface RunTail {
+  /** `<engine>:<run id>`, as runKey names it. */
+  key: string
+  /** Every event the run logged, as its record counted them when the tail was taken. */
+  total: number
+  /** The last TAIL_EVENTS of them, oldest first. */
+  lines: LogLine[]
+}
+
+export interface TailRecord {
+  key: string
+  hash: string
+  pieces: string[]
+}
+
+/** The run a tail is published for: the one started last, live or ended. */
+export function newestRun(runs: readonly RunView[]): RunView | null {
+  let newest: RunView | null = null
+  for (const run of runs) if (!newest || run.startedAt > newest.startedAt) newest = run
+  return newest
+}
+
+/** { k: key, n: total, a: base time, l: [[ts - a, text, tone], ...] } */
+function tailWire(key: string, total: number, lines: readonly LogLine[], max: number): string {
+  const a = lines.length ? lines[0].ts : 0
+  return JSON.stringify({ k: key, n: total, a, l: lines.map((l) => [l.ts - a, clip(l.text, max), code(TONES, l.tone)]) })
+}
+
+/**
+ * The run's last TAIL_EVENTS events as one tail record of at most TAIL_CHUNKS_MAX pieces. Each
+ * line is clipped at 400 characters, as in the run record; 50 of those fit. Lines that escape
+ * badly in JSON (quotes, control characters) could not, so they are clipped harder, to 200, 100
+ * and then 40 characters, and only past that do the oldest events go.
+ */
+export function encodeTail(run: RunView, log: readonly LogLine[]): TailRecord {
+  const key = runKey(run)
+  const total = Math.max(run.logCount, log.length)
+  let lines = log.slice(-TAIL_EVENTS)
+  const fits = (text: string) => Math.ceil(text.length / PIECE_MAX) <= TAIL_CHUNKS_MAX
+  let text = ''
+  for (const max of [400, 200, 100, 40]) {
+    text = tailWire(key, total, lines, max)
+    if (fits(text)) break
+  }
+  while (!fits(text) && lines.length > 1) {
+    lines = lines.slice(1)
+    text = tailWire(key, total, lines, 40)
+  }
+  return { key, hash: hashOf(text), pieces: split(text).slice(0, TAIL_CHUNKS_MAX) }
+}
+
+/** A tail record back into a RunTail; null when it is not one. */
+export function decodeTail(v: unknown): RunTail | null {
+  if (!isObj(v) || typeof v.k !== 'string' || v.k.length > 240 || typeof v.a !== 'number' || !Number.isFinite(v.a)) return null
+  if (!Number.isSafeInteger(v.n) || (v.n as number) < 0) return null
+  const a = v.a
+  const lines: LogLine[] = []
+  for (const raw of arr(v.l).slice(-TAIL_EVENTS)) {
+    const l = arr(raw)
+    const ts = abs(l[0], a)
+    if (ts === null || typeof l[1] !== 'string') continue
+    lines.push({ ts, text: l[1].slice(0, 400), tone: fromCode(TONES, l[2], 'info') })
+  }
+  return { key: v.k, total: Math.max(v.n as number, lines.length), lines }
+}
+
+export function tailLine(hash: string, index: number, count: number, piece: string): string {
+  return `${BEACON_PREFIX}t ${hash} ${index} ${count} ${piece}`
+}
+
 // ── Writing ────────────────────────────────────────────
 
 export interface Manifest {
@@ -265,10 +357,13 @@ export interface Manifest {
   intervalMs: number
   /** [hash, pieces, key] for each run, live ones first. */
   runs: [string, number, string][]
+  /** [hash, pieces, key] of the newest run's tail, when there is one. */
+  tail?: [string, number, string] | null
 }
 
 function manifestLine(m: Manifest): string {
-  const base = { v: BEACON_VERSION, b: m.boot, q: m.seq, t: m.t, iv: m.intervalMs }
+  const base: Obj = { v: BEACON_VERSION, b: m.boot, q: m.seq, t: m.t, iv: m.intervalMs }
+  if (m.tail) base.tl = m.tail
   const runs = [...m.runs]
   // Never longer than a line: the oldest entries go (the caller has already capped the count).
   let line = `${BEACON_PREFIX}m ${JSON.stringify({ ...base, r: runs })}`
@@ -311,6 +406,9 @@ export class BeaconWriter {
   private lastBeat = 0
   private lastWrite = -Infinity
   private pending: RunRecord[] | null = null
+  private pendingTail: TailRecord | null = null
+  /** The tail last encoded, and what it was taken from: encoded again only when that changes. */
+  private tailMemo: { from: string; record: TailRecord } | null = null
   private readonly write: (line: string) => void
   private readonly intervalMs: number
 
@@ -330,9 +428,24 @@ export class BeaconWriter {
     this.write(line)
   }
 
-  /** This computer's runs now (live first, then newest), as the worker scanned them. */
-  update(runs: RunView[], now = Date.now()): void {
+  /**
+   * This computer's runs now (live first, then newest), as the worker scanned them. `fullLog`
+   * gives a run's kept log lines, for the newest run's tail; without it no tail is published.
+   */
+  update(runs: RunView[], now = Date.now(), fullLog?: (run: RunView) => readonly LogLine[] | null): void {
     this.pending = pickRecords(runs)
+    this.pendingTail = null
+    const newest = fullLog ? newestRun(runs) : null
+    if (newest && fullLog) {
+      // The newest run, its log's length and its last line: the tail changes only with these.
+      const last = newest.log.at(-1)
+      const from = JSON.stringify([runKey(newest), newest.logCount, newest.updatedAt, last?.ts ?? null, last?.text ?? null])
+      if (this.tailMemo?.from !== from) {
+        const log = fullLog(newest)
+        this.tailMemo = log ? { from, record: encodeTail(newest, log) } : null
+      }
+      this.pendingTail = this.tailMemo?.record ?? null
+    }
     this.tick(now)
   }
 
@@ -340,24 +453,41 @@ export class BeaconWriter {
   tick(now = Date.now()): void {
     const records = this.pending
     if (!records) return
-    const key = JSON.stringify(records.map((r) => r.hash))
+    const tail = this.pendingTail
+    // Written marks by line kind: a run record's hash, and `t:` before a tail's.
+    const tailMark = tail ? `t:${tail.hash}` : null
+    const key = JSON.stringify([records.map((r) => r.hash), tail?.hash ?? null])
     const old = (mark: { line: number; at: number }) => this.lines - mark.line >= REWRITE_LINES || now - mark.at >= REWRITE_MS
+    const stale = (mark: string) => !this.written.has(mark) || old(this.written.get(mark)!)
     const changed = !this.manifest || this.manifest.key !== key
-    const rewrite = !changed && (old(this.manifest!) || records.some((r) => !this.written.has(r.hash) || old(this.written.get(r.hash)!)))
+    const rewrite = !changed && (old(this.manifest!) || records.some((r) => stale(r.hash)) || (tailMark !== null && stale(tailMark)))
     if ((changed || rewrite) && now - this.lastWrite >= BEACON_MIN_GAP_MS) {
       for (const record of records) {
-        const mark = this.written.get(record.hash)
-        if (mark && !old(mark)) continue
+        if (!stale(record.hash)) continue
         record.pieces.forEach((piece, i) => this.emit(chunkLine(record.hash, i, record.pieces.length, piece)))
         this.written.set(record.hash, { line: this.lines, at: now })
       }
+      if (tail && tailMark && stale(tailMark)) {
+        tail.pieces.forEach((piece, i) => this.emit(tailLine(tail.hash, i, tail.pieces.length, piece)))
+        this.written.set(tailMark, { line: this.lines, at: now })
+      }
       // Pieces first, then the manifest that names them.
-      this.emit(manifestLine({ boot: this.boot, seq: ++this.seq, t: now, intervalMs: this.intervalMs, runs: records.map((r) => [r.hash, r.pieces.length, r.key]) }))
+      this.emit(
+        manifestLine({
+          boot: this.boot,
+          seq: ++this.seq,
+          t: now,
+          intervalMs: this.intervalMs,
+          runs: records.map((r) => [r.hash, r.pieces.length, r.key]),
+          tail: tail ? [tail.hash, tail.pieces.length, tail.key] : null,
+        }),
+      )
       this.manifest = { key, line: this.lines, at: now }
       this.lastBeat = now
       this.lastWrite = now
       // Forget what the manifest no longer names.
-      const named = new Set(records.map((r) => r.hash))
+      const named = new Set<string>(records.map((r) => r.hash))
+      if (tailMark) named.add(tailMark)
       for (const hash of [...this.written.keys()]) if (!named.has(hash)) this.written.delete(hash)
       return
     }
@@ -377,6 +507,8 @@ export interface BeaconLog {
   manifest: Manifest | null
   /** Every record held whole, by hash, as its joined text. */
   records: Map<string, string>
+  /** Every tail record held whole, by hash, as its joined text. */
+  tails: Map<string, string>
 }
 
 const HASH = /^[0-9a-f]{16}$/
@@ -396,7 +528,9 @@ function header(raw: unknown): { boot: string; seq: number; t: number; intervalM
  * writer's clock says. Lines that are not beacons (the worker's own messages) are skipped.
  */
 export function readBeaconLog(lines: readonly unknown[]): BeaconLog {
-  const pieces = new Map<string, { count: number; parts: (string | undefined)[] }>()
+  type Parts = Map<string, { count: number; parts: (string | undefined)[] }>
+  const pieces: Parts = new Map()
+  const tailPieces: Parts = new Map()
   let latest: BeaconLog['latest'] = null
   let manifest: Manifest | null = null
   for (const entry of lines.slice(-ORCA_LOG_LINES * 2)) {
@@ -404,17 +538,18 @@ export function readBeaconLog(lines: readonly unknown[]): BeaconLog {
     if (typeof line !== 'string' || !line.startsWith(BEACON_PREFIX) || line.length > 8192) continue
     const body = line.slice(BEACON_PREFIX.length)
     const kind = body.slice(0, 2)
-    if (kind === 'c ') {
-      const m = /^c ([0-9a-f]{16}) (\d{1,3}) (\d{1,3}) /.exec(body)
+    if (kind === 'c ' || kind === 't ') {
+      const m = /^[ct] ([0-9a-f]{16}) (\d{1,3}) (\d{1,3}) /.exec(body)
       if (!m) continue
       const [, hash, i, n] = m
       const index = Number(i)
       const count = Number(n)
-      if (count < 1 || count > RUN_CHUNKS_MAX || index >= count) continue
-      let set = pieces.get(hash)
+      if (count < 1 || count > (kind === 'c ' ? RUN_CHUNKS_MAX : TAIL_CHUNKS_MAX) || index >= count) continue
+      const into = kind === 'c ' ? pieces : tailPieces
+      let set = into.get(hash)
       if (!set || set.count !== count) {
         set = { count, parts: [] }
-        pieces.set(hash, set)
+        into.set(hash, set)
       }
       set.parts[index] = body.slice(m[0].length)
       continue
@@ -438,16 +573,46 @@ export function readBeaconLog(lines: readonly unknown[]): BeaconLog {
         if (typeof hash === 'string' && HASH.test(hash) && Number.isSafeInteger(count) && (count as number) >= 1 && typeof key === 'string' && key.length <= 240)
           runs.push([hash, count as number, key])
       }
-      manifest = { ...head, runs }
+      const [hash, count, key] = arr((raw as Obj).tl)
+      const tail: Manifest['tail'] =
+        typeof hash === 'string' && HASH.test(hash) && Number.isSafeInteger(count) && (count as number) >= 1 && (count as number) <= TAIL_CHUNKS_MAX && typeof key === 'string' && key.length <= 240
+          ? [hash, count as number, key]
+          : null
+      manifest = { ...head, runs, tail }
     }
   }
-  const records = new Map<string, string>()
-  for (const [hash, set] of pieces) {
-    let whole = true
-    for (let i = 0; i < set.count; i++) if (set.parts[i] === undefined) whole = false
-    if (whole) records.set(hash, set.parts.join(''))
+  const whole = (from: Parts) => {
+    const out = new Map<string, string>()
+    for (const [hash, set] of from) {
+      let all = true
+      for (let i = 0; i < set.count; i++) if (set.parts[i] === undefined) all = false
+      if (all) out.set(hash, set.parts.join(''))
+    }
+    return out
   }
-  return { latest, manifest, records }
+  return { latest, manifest, records: whole(pieces), tails: whole(tailPieces) }
+}
+
+/**
+ * The tail the newest manifest names, when the log holds it whole and it names the run it says;
+ * else null. `previous` (the tail shown last time) stands in while one of the same run is being
+ * rewritten, so "Show all" does not blink between reads.
+ */
+export function assembleTail(log: BeaconLog, previous: RunTail | null = null): RunTail | null {
+  const named = log.manifest?.tail
+  if (!named) return null
+  const [hash, , key] = named
+  const text = log.tails.get(hash)
+  let tail: RunTail | null = null
+  if (text !== undefined) {
+    try {
+      tail = decodeTail(JSON.parse(text))
+    } catch {
+      tail = null
+    }
+  }
+  if (tail && tail.key === key) return tail
+  return previous && previous.key === key ? previous : null
 }
 
 /**

@@ -284,8 +284,15 @@ export default function activate(orca: OrcaWorkerApi): void {
       local = { ...local, scannedAt: Date.now(), error: (error as Error).message }
     }
     try {
-      // This computer's own runs, for the desktops it is paired to.
-      beacon.update(local.runs)
+      // This computer's own runs, for the desktops it is paired to, with the newest one's last
+      // events (its kept log, read from what the source already holds).
+      beacon.update(local.runs, Date.now(), (run) => {
+        try {
+          return sourceOf(run.engine).log(run.id).lines
+        } catch {
+          return null
+        }
+      })
     } catch (error) {
       say(`publishing to paired desktops failed: ${(error as Error).message}`)
     }

@@ -29,7 +29,10 @@ if (args[0] === 'environment' && args[1] === 'list') {
   // every 10 s: the reader takes that for a worker that keeps writing.
   const lines = []
   const writer = new BeaconWriter({ boot: Math.floor(Date.now() / 10000).toString(16), write: (line) => lines.push({ ts: Date.now(), level: 'info', line }) })
-  writer.update(listRunDirs(root).slice(0, 12).map((d) => new RunWatch(d.runId, d.dir).refresh()))
+  const watches = listRunDirs(root).slice(0, 12).map((d) => new RunWatch(d.runId, d.dir))
+  const runs = watches.map((w) => w.refresh())
+  // The newest run's last events go out as its tail, as the real worker sends them.
+  writer.update(runs, Date.now(), (run) => watches[runs.indexOf(run)]?.log().lines ?? null)
   out({ ok: true, result: { pluginKey: args[2], lines, cursor: 'fake:1' } })
 } else if (args[0] === 'plugin' && args[1] === 'dev' && args[2] === 'request') {
   const what = args[4]

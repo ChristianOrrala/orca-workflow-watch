@@ -12,7 +12,7 @@ const lib = createRequire(import.meta.url)('../panel/lib.js') as {
   phaseLabel(t: unknown): string
   mergeLog(full: unknown[], tail: unknown[]): { ts: number; text: string }[]
   atBottom(scrollTop: number, clientHeight: number, scrollHeight: number): boolean
-  logNote(o: { total: number; shown: number; dropped: number; loading: boolean; error: string | null }): string
+  logNote(o: { total: number; shown: number; dropped: number; loading: boolean; error: string | null; stays?: string | null }): string
 }
 
 const alive = () => true
@@ -160,4 +160,17 @@ test('the log dialog says what it shows: every line, the last 500 of more, loadi
   assert.equal(note({ total: 1650, shown: 500, dropped: 1100 }), 'The last 500 · 1,150 older not kept')
   assert.equal(note({ total: 642, shown: 3, loading: true }), 'Loading…')
   assert.equal(note({ total: 642, shown: 3, error: 'could not connect to Mac mini' }), 'could not connect to Mac mini')
+})
+
+test('a paired server’s newest run: the dialog shows its last 50 events and says the rest stay there', () => {
+  const note = (o: Partial<Parameters<typeof lib.logNote>[0]>) => lib.logNote({ total: 0, shown: 0, dropped: 0, loading: false, error: null, ...o })
+  assert.equal(
+    note({ total: 1234, shown: 50, dropped: 1184, stays: 'Work' }),
+    'The last 50 of 1,234 events. The rest stay on Work: open Workflows there to read them.',
+  )
+  // Lines the snapshot added since the tail was read count in both numbers.
+  assert.equal(note({ total: 1236, shown: 52, dropped: 1184, stays: 'Work' }), 'The last 52 of 1,236 events. The rest stay on Work: open Workflows there to read them.')
+  // A run that logged 50 or fewer shows them all, wherever it ran.
+  assert.equal(note({ total: 31, shown: 31, stays: 'Work' }), 'All 31 events')
+  assert.equal(note({ total: 1234, shown: 3, loading: true, stays: 'Work' }), 'Loading…')
 })

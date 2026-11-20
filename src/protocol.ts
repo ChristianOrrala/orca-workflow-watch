@@ -136,6 +136,11 @@ export interface HostStatus {
    * publishes its runs only: those stay on the server.
    */
   details: boolean
+  /**
+   * `<engine>:<run id>` of the run whose last events (up to 50) the server publishes, its newest;
+   * "Show all" on it reads those. Null or absent when there is none (a server older than 0.4.1).
+   */
+  tail?: string | null
 }
 
 /** One engine this computer watches, for the footer and the empty state. */

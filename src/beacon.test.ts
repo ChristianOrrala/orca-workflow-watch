@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   assembleRuns,
+  assembleTail,
   assessBeacon,
   BEACON_INTERVAL_MS,
   BEACON_MAX_CHARS,
@@ -11,9 +12,13 @@ import {
   BeaconWriter,
   chunkLine,
   decodeRun,
+  decodeTail,
   emptyTracker,
   encodeRun,
+  encodeTail,
+  newestRun,
   ORCA_LOG_LINES,
+  ORCA_SPARE_LINES,
   pickRecords,
   readBeaconLog,
   REWRITE_LINES,
@@ -21,10 +26,13 @@ import {
   runKey,
   SET_CHUNKS_MAX,
   split,
+  TAIL_CHUNKS_MAX,
+  TAIL_EVENTS,
+  tailLine,
 } from './beacon'
 import { OdwSource } from './sources/odw'
 import { AgentPrismSource } from './sources/agentprism'
-import type { AgentView, RunView } from './protocol'
+import type { AgentView, LogLine, RunView } from './protocol'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const fixtures = join(here, '..', 'test', 'fixtures')
@@ -251,7 +259,7 @@ test('records are written again before the log’s cut-off reaches them', () => 
   assert.equal(copies, 2, 'written again in the same 200 lines')
 })
 
-test('a manifest names at most 60 pieces: the oldest finished runs are left out, live ones never', () => {
+test('a manifest names at most 54 run pieces: the oldest finished runs are left out, live ones never', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({ ...bigRun(50), id: `big-${i}` }))
   const live = { ...bigRun(50, 'running'), id: 'live' }
   const records = pickRecords([live, ...many])
@@ -293,4 +301,145 @@ test('a server clock that disagrees does not matter once the beacon is seen movi
   // A restarted worker (another boot, or its sequence back at 1) counts as moving.
   now += 10_000
   assert.equal(assessBeacon({ ...skewed(1), boot: 'bb' }, r.tracker, now).fresh, true)
+})
+
+// ── The newest run's tail (0.4.1) ──────────────────────
+
+/** `n` log events, each `width` characters long. */
+const events = (n: number, width = 400, start = 1_795_000_000_000): LogLine[] =>
+  Array.from({ length: n }, (_, i) => ({ ts: start + i * 250, text: `event ${i} `.padEnd(width, 'x'), tone: i % 9 === 0 ? 'warn' : 'info' }))
+
+test('the budget: the newest manifest, its run records and the tail always fit in Orca’s 200 lines', () => {
+  // A record the manifest names is under REWRITE_LINES old when a write starts; one write is every
+  // run piece, every tail piece and the manifest. What is left stays free for Orca's own lines.
+  const write = SET_CHUNKS_MAX + TAIL_CHUNKS_MAX + 1
+  assert.ok(REWRITE_LINES + write <= ORCA_LOG_LINES - ORCA_SPARE_LINES, `${REWRITE_LINES} + ${write} lines leave ${ORCA_SPARE_LINES} spare`)
+  assert.equal(REWRITE_LINES + write, 151, 'the same 151 lines as 0.4.0: the tail’s pieces came out of SET_CHUNKS_MAX')
+  // And 50 plain events of 400 characters fit the tail's pieces whole.
+  const tail = encodeTail({ ...realRuns()[0], logCount: 500 }, events(500))
+  assert.ok(tail.pieces.length <= TAIL_CHUNKS_MAX)
+  assert.equal(decodeTail(JSON.parse(tail.pieces.join('')))!.lines.length, TAIL_EVENTS)
+})
+
+test('a tail is the newest run’s last 50 events, each clipped at 400, and comes back as it went', () => {
+  const run = { ...realRuns()[0], logCount: 873 }
+  const log = events(500, 600)
+  const record = encodeTail(run, log)
+  assert.equal(record.key, runKey(run))
+  assert.ok(record.pieces.length > 1 && record.pieces.length <= TAIL_CHUNKS_MAX, `${record.pieces.length} pieces`)
+  for (const [i, piece] of record.pieces.entries()) assert.ok(tailLine(record.hash, i, record.pieces.length, piece).length < BEACON_MAX_CHARS)
+  const back = decodeTail(JSON.parse(record.pieces.join('')))!
+  assert.equal(back.key, runKey(run))
+  assert.equal(back.total, 873, 'the total the run counted, not the 50')
+  assert.deepEqual(back.lines, log.slice(-TAIL_EVENTS).map((l) => ({ ...l, text: l.text.slice(0, 400) })))
+  // A short log is all there.
+  const short = decodeTail(JSON.parse(encodeTail({ ...run, logCount: 3 }, events(3)).pieces.join('')))!
+  assert.deepEqual([short.total, short.lines.length], [3, 3])
+})
+
+test('a tail that escapes badly is clipped harder to keep its 50 events within its pieces cap', () => {
+  const run = { ...realRuns()[0], logCount: 50 }
+  // Every character a JSON \u escape: 6 characters each.
+  const nasty = events(50).map((l) => ({ ...l, text: '\u0001'.repeat(400) }))
+  const record = encodeTail(run, nasty)
+  assert.ok(record.pieces.length <= TAIL_CHUNKS_MAX)
+  const back = decodeTail(JSON.parse(record.pieces.join('')))!
+  assert.equal(back.lines.length, TAIL_EVENTS, 'clipped to 40 escaped characters, all 50 still fit')
+  assert.ok(back.lines.every((l) => l.text.length === 40))
+})
+
+test('the newest run is the one started last, live or ended', () => {
+  const [a, b] = realRuns()
+  const live = { ...a, state: 'running' as const, startedAt: 1000 }
+  const ended = { ...b, state: 'done' as const, startedAt: 2000 }
+  assert.equal(newestRun([live, ended]), ended)
+  assert.equal(newestRun([]), null)
+})
+
+test('a reader joins only whole tails, of their own line kind, and only the one the manifest names', () => {
+  const writer = orcaLog()
+  const runs = realRuns()
+  const newest = newestRun(runs)!
+  const log = events(80)
+  new BeaconWriter({ write: writer.write, boot: 'feed1234' }).update(runs, 1_000_000, (r) => (r === newest ? log : null))
+  const tailLines = writer.lines.filter((l) => l.line.startsWith(`${BEACON_PREFIX}t `))
+  assert.ok(tailLines.length >= 2)
+  const read = readBeaconLog(writer.lines)
+  assert.equal(read.manifest?.tail?.[2], runKey(newest))
+  assert.equal(read.records.has(read.manifest!.tail![0]), false, 'a tail is not a run record')
+  const tail = assembleTail(read)!
+  assert.deepEqual([tail.key, tail.lines.length, tail.lines.at(-1)!.text.slice(0, 9)], [runKey(newest), 50, 'event 79 '])
+  // The runs come across as before.
+  assert.deepEqual(assembleRuns(read, new Map()).runs, runs)
+  // One piece missing: no tail, unless the last one shown was of the same run.
+  const holed = writer.lines.filter((l) => l !== tailLines[0])
+  assert.equal(assembleTail(readBeaconLog(holed)), null)
+  assert.equal(assembleTail(readBeaconLog(holed), tail), tail)
+  assert.equal(assembleTail(readBeaconLog(holed), { ...tail, key: 'odw:other' }), null)
+  // Shuffled pieces still join.
+  const isManifest = (l: { line: string }) => l.line.startsWith(`${BEACON_PREFIX}m `)
+  const shuffled = [...writer.lines].reverse().filter((l) => !isManifest(l)).concat(writer.lines.filter(isManifest))
+  assert.equal(assembleTail(readBeaconLog(shuffled))?.lines.length, 50)
+})
+
+test('the tail is written again when the newest run changes or its log grows, and not otherwise', () => {
+  const out = orcaLog()
+  const writer = new BeaconWriter({ write: out.write, boot: 'feed1234' })
+  const runs = realRuns()
+  const newest = newestRun(runs)!
+  let log = events(10)
+  let asked = 0
+  const fullLog = (r: RunView) => {
+    asked++
+    return r === newest || runKey(r) === runKey(newest) ? log : null
+  }
+  let now = 1_000_000
+  writer.update(runs, now, fullLog)
+  // Tails written: their first pieces.
+  const tails = () => out.lines.filter((l) => /^WWATCH1 t [0-9a-f]{16} 0 /.test(l.line)).length
+  assert.equal(tails(), 1)
+  for (let i = 0; i < 20; i++) writer.update(runs, (now += 1000), fullLog)
+  assert.equal(tails(), 1, 'nothing changed: heartbeats only')
+  assert.equal(asked, 1, 'the log is read again only when the run moved')
+  // Its log grows: the run's record moves, and so does its tail.
+  log = events(11)
+  const grown = runs.map((r) => (r === newest ? { ...r, logCount: 11, updatedAt: r.updatedAt + 1, log: [...r.log, log[10]] } : r))
+  writer.update(grown, (now += 3000), fullLog)
+  assert.equal(tails(), 2)
+  assert.equal(assembleTail(readBeaconLog(out.lines))!.lines.at(-1)!.text.slice(0, 9), 'event 10 ')
+  // A newer run starts: the tail is its.
+  const next: RunView = { ...newest, id: 'started-later', startedAt: newest.startedAt + 60_000, state: 'running', endedAt: null, logCount: 2, log: [] }
+  writer.update([next, ...grown], (now += 3000), (r) => (r.id === 'started-later' ? events(2) : null))
+  assert.equal(assembleTail(readBeaconLog(out.lines))!.key, runKey(next))
+})
+
+test('in Orca’s 200 lines a reader always finds every run and the newest run’s whole tail, however long the log churns', () => {
+  const log = orcaLog()
+  const writer = new BeaconWriter({ write: log.write, boot: 'feed1234' })
+  const finished = [...realRuns(), bigRun(50), bigRun(60)]
+  const full = events(500)
+  let now = 1_000_000
+  for (let step = 0; step < 2000; step++) {
+    now += 1000
+    // A live run, started last, whose log grows by a long event every second.
+    const lines = full.slice(0, Math.min(500, step + 1)).map((l, i) => ({ ...l, text: `${step - i} ${l.text}` }))
+    const live: RunView = { ...finished[0], id: 'live', state: 'running', startedAt: Math.max(...finished.map((r) => r.startedAt)) + 1000, endedAt: null, updatedAt: now, logCount: step + 1, log: lines.slice(-3) }
+    writer.update([live, ...finished], now, (r) => (r.id === 'live' ? lines : null))
+    if (step % 13 === 0) {
+      writer.noteLine()
+      log.write('a message of the worker')
+    }
+    if (step % 97 === 0) log.write('a line Orca added itself')
+    if (step % 50 === 49) {
+      const read = readBeaconLog(log.lines)
+      const { runs, missing } = assembleRuns(read, new Map())
+      assert.equal(missing, 0, `step ${step}: every record of the newest manifest is whole`)
+      assert.equal(runs.length, finished.length + 1)
+      const tail = assembleTail(read)
+      assert.ok(tail, `step ${step}: the tail is whole`)
+      assert.equal(tail.key, 'odw:live')
+      assert.equal(tail.lines.length, step < TAIL_EVENTS ? tail.total : TAIL_EVENTS, 'every event while there are fewer than 50, then the last 50')
+      assert.ok(tail.total >= step - 3, 'the tail is at most a couple of seconds old')
+    }
+  }
 })

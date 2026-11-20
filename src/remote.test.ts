@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { classify, findCopies, isOurKey, LIVE_READ_MS, RemoteHosts, type CliResult } from './remote'
-import { BeaconWriter, ORCA_LOG_LINES } from './beacon'
+import { BeaconWriter, newestRun, ORCA_LOG_LINES } from './beacon'
 import { OdwSource } from './sources/odw'
 import type { RunView } from './protocol'
 
@@ -221,4 +221,32 @@ test('failures are sorted into what the panel can say', () => {
   assert.equal(classify({ error: { code: 'runtime_error', message: 'Plugin service is not available on this runtime' } }).state, 'no-plugin')
   assert.equal(classify({ error: { code: 'plugin_request_failed', message: 'x', data: { requestCode: 'unknown_method' } } }).state, 'no-plugin')
   assert.equal(classify({ error: { code: 'weird', message: 'something else' } }).state, 'error')
+})
+
+test('from an installed copy, "Show all" on the server’s newest run reads its published last 50 events; other runs stay there', async () => {
+  const work = server()
+  const runs = realRuns()
+  const newest = newestRun(runs)!
+  const older = runs.find((r) => r !== newest)!
+  const full = Array.from({ length: 120 }, (_, i) => ({ ts: newest.startedAt + i, text: `event ${i}`, tone: 'info' as const }))
+  const shown = runs.map((r) => (r === newest ? { ...r, logCount: 120 } : r))
+  work.writer.update(shown, 2_000_000, (r) => (r.id === newest.id ? full : null))
+  const { remote, calls } = hostsWith(
+    (args) => {
+      if (args[0] === 'environment') return ok({ environments: [{ id: 'w', name: 'Work' }] })
+      if (args[1] === 'list') return answer('plugins.json')
+      if (args[1] === 'logs') return work.logs()
+      throw new Error(`unexpected call ${args.join(' ')}`)
+    },
+    { now: () => 2_000_000 },
+  )
+  await remote.tick(2_000_000)
+  const [host] = remote.hosts()
+  assert.deepEqual([host.state, host.details, host.tail], ['ok', false, `${newest.engine}:${newest.id}`])
+  const log = await remote.runLog('w', newest.id, newest.engine)
+  assert.deepEqual(log.lines, full.slice(-50))
+  assert.equal(log.dropped, 70, 'the other 70 stay on the server')
+  assert.equal(calls.some((c) => c[1] === 'dev'), false, 'read from the beacon, not asked of the server')
+  await assert.rejects(remote.runLog('w', older.id, older.engine), /stays on Work/)
+  await assert.rejects(remote.runLog('w', newest.id, newest.engine === 'odw' ? 'agentprism' : 'odw'), /stays on Work/, 'the same id in another engine is another run')
 })
