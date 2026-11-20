@@ -24,6 +24,11 @@ if (args[0] === 'environment' && args[1] === 'list') {
   if (what === 'watch.snapshot') {
     const runs = dirs.map((d) => new RunWatch(d.runId, d.dir).refresh())
     out({ ok: true, result: { pluginKey: args[3], name: what, result: { root: '~/.odw/runs', rootExists: true, runs, hosts: [], localName: name, scannedAt: Date.now(), error: null } } })
+  } else if (what === 'watch.log' && !process.env.FAKE_ORCA_OLD) {
+    const found = dirs.find((d) => d.runId === data.runId)
+    const watch = found ? new RunWatch(found.runId, found.dir) : null
+    watch?.refresh()
+    out({ ok: true, result: { pluginKey: args[3], name: what, result: watch ? watch.log() : { runId: data.runId, lines: [], dropped: 0 } } })
   } else if (what === 'watch.agent') {
     const dir = dirs.find((d) => d.runId === data.runId)?.dir ?? join(root, 'missing')
     out({ ok: true, result: { pluginKey: args[3], name: what, result: readAgent(dir, data.runId, data.agentId) } })

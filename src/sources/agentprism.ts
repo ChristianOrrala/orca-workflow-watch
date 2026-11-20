@@ -9,7 +9,7 @@
 // would reconcile and rewrite runs, so this reads the files directly.
 import { existsSync, lstatSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import type { AgentDetail, RunView } from '../protocol'
+import type { AgentDetail, RunLog, RunView } from '../protocol'
 import { buildView, clip, EventTail, isLive, num, pidAlive, readJson, readSmall, RunAccumulator, str, type Json } from '../model'
 
 /** The saved script read for its meta, and the events read again for one agent's detail. */
@@ -436,6 +436,11 @@ export class AgentPrismWatch {
     }
   }
 
+  /** Every log line kept, as of the last refresh. */
+  log(): RunLog {
+    return this.acc.fullLog(this.runId)
+  }
+
   /** The nth agent call (in the order the log first names them): its prompt and its reply. */
   agent(agentId: number): AgentDetail {
     const ids = new Map<string, number>()
@@ -575,5 +580,11 @@ export class AgentPrismSource implements RunSource {
     const runWatch = this.watches.get(runId)
     if (!runWatch) throw Object.assign(new Error(`no AgentPrism run ${runId} is being watched`), { code: 'invalid_params' })
     return runWatch.agent(agentId)
+  }
+
+  log(runId: string): RunLog {
+    const runWatch = this.watches.get(runId)
+    if (!runWatch) throw Object.assign(new Error(`no AgentPrism run ${runId} is being watched`), { code: 'invalid_params' })
+    return runWatch.log()
   }
 }

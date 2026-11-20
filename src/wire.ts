@@ -1,7 +1,7 @@
 // What a paired server sends is checked before it is used: a run that does not have the shape
 // of a RunView is dropped, and every field the worker or the panel reads gets a safe value. A
 // peer on an older plugin, or a broken one, then costs its own runs only.
-import type { AgentView, Answer, Checkpoint, EngineId, LogLine, Outcome, PhaseView, RunView } from './protocol'
+import type { AgentView, Answer, Checkpoint, EngineId, LogLine, Outcome, PhaseView, RunLog, RunView } from './protocol'
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -73,6 +73,18 @@ function outcomeOf(v: unknown): Outcome | null {
   return { status: v.status.slice(0, 80), tone: oneOf(v.tone, OUTCOME_TONES, 'neutral'), text: text(v.text, 400) }
 }
 
+/** The most log lines a peer's answer may hold: what a run keeps (model's LOG_KEEP). */
+const LOG_LINES_MAX = 500
+
+/** A peer's full log, checked line by line; at most LOG_LINES_MAX, the newest. */
+export function normalizeLog(v: unknown, runId: string): RunLog | null {
+  if (!isObj(v) || !Array.isArray(v.lines)) return null
+  // A broken peer's huge array is cut before it is read; what is not a line is not counted.
+  const valid = v.lines.slice(-LOG_LINES_MAX * 2).map(logOf).filter((l): l is LogLine => l !== null)
+  const lines = valid.slice(-LOG_LINES_MAX)
+  return { runId, lines, dropped: count(v.dropped) + valid.length - lines.length }
+}
+
 /** A peer's run as a RunView with every field present, or null when it is not a run. */
 export function normalizeRun(v: unknown): RunView | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id || v.id.length > 200 || typeof v.workflow !== 'string') return null
@@ -102,7 +114,8 @@ export function normalizeRun(v: unknown): RunView | null {
     phases: (Array.isArray(v.phases) ? v.phases : []).map(phaseOf).filter((p): p is PhaseView => p !== null),
     agents: { total: count(agents.total), running: count(agents.running), done: count(agents.done), failed: count(agents.failed) },
     tokens: { spent: count(tokens.spent), budget: time(tokens.budget) },
-    log: (Array.isArray(v.log) ? v.log : []).map(logOf).filter((l): l is LogLine => l !== null),
+    log: (Array.isArray(v.log) ? v.log : []).slice(-LOG_LINES_MAX).map(logOf).filter((l): l is LogLine => l !== null),
+    logCount: typeof v.logCount === 'number' ? count(v.logCount) : null,
     waiting,
     checkpoints: (Array.isArray(v.checkpoints) ? v.checkpoints : []).slice(-24).map(checkpointOf).filter((c): c is Checkpoint => c !== null),
     answer: answerOf(v.answer),

@@ -8,8 +8,8 @@ import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { AgentDetail, EngineId, HostStatus, RunView, Snapshot } from './protocol'
-import { normalizeRun } from './wire'
+import type { AgentDetail, EngineId, HostStatus, RunLog, RunView, Snapshot } from './protocol'
+import { normalizeLog, normalizeRun } from './wire'
 
 export interface CliResult {
   code: number
@@ -238,5 +238,24 @@ export class RemoteHosts {
     const detail = (envelope.result as { result?: AgentDetail } | undefined)?.result
     if (!envelope.ok || !detail) throw Object.assign(new Error(classify(envelope).error), { code: 'action_failed' })
     return detail
+  }
+
+  /**
+   * One run's full log from the server it runs on. A server on an older plugin has no
+   * `watch.log`: that fails with code `not_supported`, and the panel keeps the short log.
+   */
+  async runLog(hostId: string, runId: string, engine: EngineId = 'odw'): Promise<RunLog> {
+    const source = this.sources.get(hostId)
+    if (!source) throw Object.assign(new Error(`no paired server ${hostId}`), { code: 'invalid_params' })
+    const out = await this.run(
+      ['plugin', 'dev', 'request', this.pluginKey(), 'watch.log', '--data', JSON.stringify(engine === 'odw' ? { runId } : { runId, engine }), '--environment', hostId, '--timeout-ms', '10000', '--json'],
+      CALL_TIMEOUT_MS,
+    )
+    const envelope = parse(out)
+    const log = envelope.ok ? normalizeLog((envelope.result as { result?: unknown } | undefined)?.result, runId) : null
+    if (log) return log
+    if (envelope.error?.data?.requestCode === 'unknown_method' || /no handler|unknown (method|request)/i.test(envelope.error?.message ?? ''))
+      throw Object.assign(new Error(`${source.env.name} runs an older Workflow Watch, which sends only the latest lines`), { code: 'not_supported' })
+    throw Object.assign(new Error(classify(envelope).error), { code: 'action_failed' })
   }
 }

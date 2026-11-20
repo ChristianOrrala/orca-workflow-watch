@@ -1,7 +1,7 @@
 // What the worker needs from a workflow engine: where its runs live, and its runs read as the
 // panel's RunView. Each engine keeps its own file layout and vocabulary behind this; the worker
 // merges every source's runs, follows paired servers and notifies, the same for all of them.
-import type { AgentDetail, EngineId, EngineInfo, RunView } from '../protocol'
+import type { AgentDetail, EngineId, EngineInfo, RunLog, RunView } from '../protocol'
 
 export interface RunSource {
   readonly id: EngineId
@@ -18,6 +18,8 @@ export interface RunSource {
   scan(history: number, log: (message: string) => void): RunView[]
   /** What one agent was asked and answered, cut short. Throws when the run is unknown. */
   agent(runId: string, agentId: number): AgentDetail
+  /** Every log line the run keeps (the newest LOG_KEEP), for "Show all". Throws when the run is unknown. */
+  log(runId: string): RunLog
   /** Forget every cached read: the root moved. */
   reset(): void
 }

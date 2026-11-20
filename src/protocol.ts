@@ -81,7 +81,10 @@ export interface RunView {
   phases: PhaseView[]
   agents: { total: number; running: number; done: number; failed: number }
   tokens: { spent: number; budget: number | null }
+  /** The last few log lines; the rest come from `watch.log`. */
   log: LogLine[]
+  /** Every line the run logged, the dropped ones included; null from a peer on an older plugin. */
+  logCount: number | null
   waiting: { title: string; since: number; checkpointId: number | null } | null
   /**
    * Every checkpoint the run stopped at, oldest first: when it asked and when it was answered
@@ -153,6 +156,13 @@ export interface Snapshot {
   error: string | null
 }
 
+/** Every log line a run keeps, oldest first, for "Show all"; `dropped` older ones are gone. */
+export interface RunLog {
+  runId: string
+  lines: LogLine[]
+  dropped: number
+}
+
 export interface AgentDetail {
   runId: string
   agentId: number
@@ -169,6 +179,8 @@ declare module 'orca' {
     /** What one agent was asked and answered, cut short; `host` names the paired server it ran on. */
     'watch.agent': { input: { runId: string; agentId: number; host?: string | null; engine?: EngineId }; output: AgentDetail }
     /** Puts text (a command the panel shows) on this computer's clipboard. */
+    /** Every log line one run keeps (its newest 500); `host` names the paired server it ran on. */
+    'watch.log': { input: { runId: string; host?: string | null; engine?: EngineId }; output: RunLog }
     'watch.copy': { input: { text: string }; output: { copied: boolean } }
     /** Watch another runs folder for an engine (ODW when none is named); answers the new snapshot. */
     'watch.setRoot': { input: { root: string; engine?: EngineId }; output: Snapshot }

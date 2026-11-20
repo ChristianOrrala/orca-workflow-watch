@@ -11,11 +11,12 @@ import { createHash } from 'node:crypto'
 import { uptime } from 'node:os'
 import { basename, join } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
-import type { AgentState, AgentView, LogLine, LogTone, Outcome, OutcomeTone, PhaseView, RunState, RunView } from './protocol'
+import type { AgentState, AgentView, LogLine, LogTone, Outcome, OutcomeTone, PhaseView, RunLog, RunState, RunView } from './protocol'
 
 /** Beads drawn per phase; a bigger fan-out keeps its running and failed agents first. */
 export const MAX_AGENTS_PER_PHASE = 60
-const LOG_KEEP = 40
+/** Log lines a run keeps for "Show all": the newest, with a count of the older ones dropped. */
+export const LOG_KEEP = 500
 const LOG_LIVE = 8
 const LOG_ENDED = 3
 const TEXT_MAX = 240
@@ -183,6 +184,9 @@ interface PhaseRec {
   startedAt: number | null
   order: number
   commands: { running: number; done: number; failed: number }
+  /** When its first command started and its last one ended: a command-only phase's real span. */
+  commandsFrom: number | null
+  commandsTo: number | null
 }
 
 /** Folds one run's events into its state, a few at a time as they arrive. */
@@ -197,6 +201,8 @@ export class RunAccumulator {
   readonly phases = new Map<string, PhaseRec>()
   private readonly commands = new Map<number, { phase: string; state: AgentState }>()
   readonly log: LogLine[] = []
+  /** Lines noted before the kept ones, no longer held. */
+  logDropped = 0
   waiting: { title: string; since: number; checkpointId: number | null } | null = null
   /** The checkpoints asked so far, oldest first; the last few only. */
   readonly checkpoints: { title: string; since: number; until: number | null }[] = []
@@ -220,6 +226,8 @@ export class RunAccumulator {
           startedAt: null,
           order: this.order++,
           commands: { running: 0, done: 0, failed: 0 },
+          commandsFrom: null,
+          commandsTo: null,
         })
       }
     }
@@ -229,7 +237,7 @@ export class RunAccumulator {
     const key = title ?? ''
     let phase = this.phases.get(key)
     if (!phase) {
-      phase = { title: key, detail: null, declared: false, startedAt: null, order: this.order++, commands: { running: 0, done: 0, failed: 0 } }
+      phase = { title: key, detail: null, declared: false, startedAt: null, order: this.order++, commands: { running: 0, done: 0, failed: 0 }, commandsFrom: null, commandsTo: null }
       this.phases.set(key, phase)
     }
     return phase
@@ -237,7 +245,15 @@ export class RunAccumulator {
 
   private note(ts: number, text: string, tone: LogTone): void {
     this.log.push({ ts, text: clip(text), tone })
-    if (this.log.length > LOG_KEEP) this.log.splice(0, this.log.length - LOG_KEEP)
+    if (this.log.length > LOG_KEEP) {
+      this.logDropped += this.log.length - LOG_KEEP
+      this.log.splice(0, this.log.length - LOG_KEEP)
+    }
+  }
+
+  /** Every line kept, oldest first, and how many older ones were dropped. */
+  fullLog(runId: string): RunLog {
+    return { runId, lines: this.log.map((l) => ({ ...l })), dropped: this.logDropped }
   }
 
   feed(ev: Json): void {
@@ -314,6 +330,9 @@ export class RunAccumulator {
         const state: AgentState = ev.type === 'command_started' ? 'running' : ev.type === 'command_failed' ? 'failed' : 'done'
         if (before) phase.commands[before.state]--
         phase.commands[state]++
+        // ODW can run a phase's commands before it marks the phase: their times are its span.
+        phase.commandsFrom = Math.min(phase.commandsFrom ?? ts, ts)
+        if (state !== 'running') phase.commandsTo = Math.max(phase.commandsTo ?? ts, ts)
         this.commands.set(id, { phase: phase.title, state })
         if (state === 'failed') this.note(ts, `${str(ev.label) ?? 'a command'} failed`, 'warn')
         break
@@ -491,13 +510,16 @@ export function buildView(files: RunFiles, acc: RunAccumulator, alive: (pid: unk
       phaseState = 'skipped'
     }
     const ends = agents.map((a) => a.endedAt).filter((t): t is number => t !== null)
+    if (rec.commandsTo !== null) ends.push(rec.commandsTo)
     const { shown, hidden } = pickAgents(agents)
+    const starts = [rec.startedAt, agents[0]?.startedAt ?? null, rec.commandsFrom].filter((t): t is number => t !== null)
+    const phaseStart = starts.length ? Math.min(...starts) : null
     phases.push({
       title: rec.title,
       detail: rec.detail,
       state: phaseState,
-      startedAt: rec.startedAt ?? (agents[0]?.startedAt ?? null),
-      endedAt: phaseState === 'done' || phaseState === 'failed' ? (ends.length ? Math.max(...ends) : rec.startedAt) : null,
+      startedAt: phaseStart,
+      endedAt: phaseState === 'done' || phaseState === 'failed' ? (ends.length ? Math.max(...ends, phaseStart ?? 0) : phaseStart) : null,
       agents: shown,
       hiddenAgents: hidden,
       commands: { ...rec.commands },
@@ -536,6 +558,7 @@ export function buildView(files: RunFiles, acc: RunAccumulator, alive: (pid: unk
     },
     tokens: { spent, budget: num(meta?.budgetTotal) },
     log: acc.log.slice(isLive(state) ? -LOG_LIVE : -LOG_ENDED),
+    logCount: acc.log.length + acc.logDropped,
     waiting: shownWaiting,
     checkpoints: acc.checkpoints.map((c) => ({ ...c })),
     answer: null,
@@ -656,6 +679,11 @@ export class RunWatch {
       if (result !== null || this.acc.ended) this.result = result
     }
     return buildView({ runId: this.runId, status: this.status, meta: this.meta, result: this.result }, this.acc, alive)
+  }
+
+  /** Every log line kept, as of the last refresh. */
+  log(): RunLog {
+    return this.acc.fullLog(this.runId)
   }
 }
 

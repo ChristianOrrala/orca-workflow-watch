@@ -397,6 +397,15 @@ export default function activate(orca: OrcaWorkerApi): void {
     return sourceOf(engine).agent(runId, agentId)
   })
 
+  orca.panels.handle('watch.log', async ({ runId, host, engine }) => {
+    await ready
+    if (typeof runId !== 'string' || !runId || runId.length > 200) throw failure('invalid_params', 'name a run')
+    if (engine != null && engine !== 'odw' && engine !== 'agentprism') throw failure('invalid_params', `no engine ${String(engine)}`)
+    if (host != null && typeof host !== 'string') throw failure('invalid_params', 'a host is a server id')
+    if (host) return remote.runLog(host, runId, engine ?? 'odw')
+    return sourceOf(engine).log(runId)
+  })
+
   // The panel's frame has no clipboard of its own: the worker, on the same computer, copies.
   orca.panels.handle('watch.copy', async ({ text }) => {
     if (typeof text !== 'string' || !text || text.length > 2000) throw failure('invalid_params', 'nothing to copy')

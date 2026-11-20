@@ -5,7 +5,10 @@
   'use strict'
 
   const orca = window.orca
+  const WW = window.WorkflowWatch // panel/lib.js: phase times and the log window
   const LINGER_MS = 6000
+  /** Lines the open log shows at most: what the worker keeps (LOG_KEEP in src/model.ts). */
+  const LOG_MAX = 500
   // Nothing performs on the first paint: entrances play only for what arrives later.
   document.documentElement.classList.add('boot')
   const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -31,6 +34,7 @@
     counts: new Map(), // tally word -> last count, so a change can ping
     prevCards: new Set(), // run keys that were live cards at the last paint: a row for one is filing
     observed: new Set(), // cards watched for scrolling out of view
+    logs: new Map(), // run key -> { lines, dropped, count, loading, error, again, stick }: an open full log
   }
 
   // ── Small helpers ──────────────────────────────────────
@@ -413,7 +417,7 @@
     const band = h('div', 'band')
     band.setAttribute('role', 'group')
     const bh = h('div', 'bh')
-    bh.append(h('span', 't'), h('span', 'n'), h('span', 'cmd'))
+    bh.append(h('span', 't'), h('span', 'n'), h('span', 'cmd'), h('span', 'dur'))
     band.append(bh, h('div', 'lanes'))
     return band
   }
@@ -435,6 +439,7 @@
     flow.dataset.t1 = live && run.state !== 'paused' ? '' : String(run.endedAt ?? run.updatedAt)
     const selected = ui.sheet && ui.sheet.key === key ? ui.sheet.agentId : null
     const cut = held(run) || !live
+    const times = WW.phaseTimes(run, Date.now())
     reconcile(
       flow.querySelector('.bands'),
       shown,
@@ -442,7 +447,7 @@
       createBand,
       (band, p) => {
         setState(band, 'p-', p.state)
-        const [t, n, cmd] = band.firstChild.children
+        const [t, n, cmd, dur] = band.firstChild.children
         setText(t, p.title || 'Agents')
         const total = p.agents.length + p.hiddenAgents
         const settled = p.agents.filter((a) => a.state !== 'running').length + p.hiddenAgents
@@ -451,7 +456,18 @@
         const cmds = commandsOf(p)
         setText(cmd, cmds ? `${cmds} command${cmds === 1 ? '' : 's'}${c.failed ? ` · ${c.failed} failed` : c.running ? ' · running' : ' · passed'}` : '')
         toggle(cmd, 'bad', c.failed > 0)
-        band.setAttribute('aria-label', [p.title || 'Agents', n.textContent, cmd.textContent].filter(Boolean).join(', '))
+        // How long it took; the active phase's ticks with the clocks (data-tick).
+        const time = times[run.phases.indexOf(p)]
+        dur.dataset.tick = time && time.live ? String(time.from) : ''
+        setText(dur, WW.phaseLabel(time))
+        dur.title = !time
+          ? ''
+          : time.approx
+            ? `About ${WW.duration(time.ms)}: this phase was marked without times of its own, so this is the gap from the phase before it ending to the next one starting.`
+            : time.live
+              ? `Running for ${WW.duration(time.ms)}`
+              : `Took ${WW.duration(time.ms)}`
+        band.setAttribute('aria-label', [p.title || 'Agents', n.textContent, cmd.textContent, time ? `${time.live ? 'running for' : 'took'} ${time.approx ? 'about ' : ''}${WW.duration(time.ms)}` : ''].filter(Boolean).join(', '))
         band.title = p.detail || ''
         const { lanes, laneOf, commands } = lanesOf(p)
         reconcile(
@@ -585,7 +601,9 @@
   function drawMetro(el, run) {
     const shown = run.phases.filter((p) => p.title !== '' || p.agents.length)
     el.hidden = shown.length === 0
-    const sig = JSON.stringify([run.state, shown.map((p) => [p.state, p.agents.map((a) => a.state[0]).join('')])])
+    const times = WW.phaseTimes(run, Date.now())
+    const timeOf = (p) => WW.phaseLabel(times[run.phases.indexOf(p)])
+    const sig = JSON.stringify([run.state, shown.map((p) => [p.state, p.agents.map((a) => a.state[0]).join(''), isLive(run.state) ? '' : timeOf(p)])])
     if (el.dataset.sig === sig) return
     el.dataset.sig = sig
     const ran = (p) => p.state !== 'pending' && p.state !== 'skipped'
@@ -598,6 +616,9 @@
       kids.push(h('i', i === 0 || ran(shown[i - 1]) ? 'st on' : 'st'))
       const state = p.state === 'active' && !live ? 'failed' : p.state
       const seg = h('span', `ms m-${state}`)
+      // Each phase's time on hover: the row's own line stays as it was.
+      const took = timeOf(p)
+      seg.title = `${p.title || 'Agents'}${p.state === 'skipped' ? ' · skipped' : took ? ` · ${took}` : ''}`
       const n = p.agents.length
       if (n >= 2 && n <= 4) {
         seg.classList.add('split')
@@ -637,14 +658,26 @@
     const flow = createFlow()
     const sheet = h('div', 'sheet-slot')
     const ticker = h('ul', 'ticker')
+    ticker.addEventListener('scroll', () => {
+      const st = ui.logs.get(card.dataset.run)
+      if (st && ticker.classList.contains('full')) st.stick = WW.atBottom(ticker.scrollTop, ticker.clientHeight, ticker.scrollHeight)
+    })
+    const logbar = h('div', 'logbar')
+    const logToggle = h('button', 'link log-toggle')
+    logToggle.type = 'button'
+    logbar.append(h('span', 'log-note'), logToggle)
     const meter = h('div', 'meter')
     const track = h('div', 'track')
     track.append(h('div', 'fill'))
     const txt = h('span', 'txt')
     txt.append(document.createTextNode(''), h('b'), document.createTextNode(''))
     meter.append(track, txt)
-    card.append(head, desc, ask, lost, flow, sheet, ticker, meter)
+    card.append(head, desc, ask, lost, flow, sheet, ticker, logbar, meter)
     card.addEventListener('click', (event) => {
+      if (event.target.closest('.log-toggle')) {
+        toggleLog(card.dataset.run)
+        return
+      }
       const bar = event.target.closest('button.bar, .show-agent')
       if (bar) {
         openSheet(card.dataset.run, Number(bar.dataset.agent))
@@ -668,7 +701,7 @@
     toggle(card, 'celebrate', ui.celebrate.has(key))
     toggle(card, 'mourn', ui.mourn.has(key))
     const live = isLive(run.state)
-    const [head, desc, ask, lost, flow, sheetSlot, ticker, meter] = card.children
+    const [head, desc, ask, lost, flow, sheetSlot, ticker, logbar, meter] = card.children
     setIcon(head.children[0], seen.icon)
     setText(head.querySelector('h2'), run.workflow)
     const sub = head.querySelector('.sub')
@@ -753,22 +786,40 @@
 
     renderSheet(sheetSlot, run)
 
-    // Ticker: the last lines the run logged; a new one slides in and the rest glide up.
+    // Ticker: the last lines the run logged; a new one slides in and the rest glide up. Open
+    // (Show all), it is every line the run keeps, in a box that scrolls, newest at the bottom.
     // Keyed by time, text and occurrence: two equal lines in one millisecond are two rows.
+    const logState = ui.logs.get(key) || null
+    const full = Boolean(logState)
+    let shownLog = run.log
+    if (logState) {
+      // The snapshot's newer lines follow the fetched ones; a gap the snapshot cannot fill
+      // (more new lines than it carries) asks the worker again.
+      shownLog = WW.mergeLog(logState.lines, run.log).slice(-LOG_MAX)
+      if (logState.count != null && run.logCount != null && run.logCount - logState.count > run.log.length && !logState.error) {
+        if (logState.loading) logState.again = true
+        else queueMicrotask(() => loadLog(key))
+      }
+    }
     const seenLines = new Map()
-    const lines = run.log.map((l) => {
+    const lines = shownLog.map((l) => {
       const base = `${l.ts}:${l.text}`
       const n = (seenLines.get(base) || 0) + 1
       seenLines.set(base, n)
       return { ...l, key: `${base}#${n}` }
     })
-    const glide = !ticker.hidden && !calm() && !booting() ? new Map([...ticker.children].map((li) => [li.dataset.key, li.getBoundingClientRect().top])) : null
+    toggle(ticker, 'full', full)
+    // Left at the bottom, the open log follows new lines; scrolled up, it stays put.
+    const stick = full && logState.stick !== false
+    // Opening it adds hundreds of lines at once: those arrive still, not one by one.
+    const bulk = full && lines.length - ticker.children.length > 8
+    const glide = !full && !ticker.hidden && !calm() && !booting() ? new Map([...ticker.children].map((li) => [li.dataset.key, li.getBoundingClientRect().top])) : null
     reconcile(
       ticker,
       lines,
       (l) => l.key,
       () => {
-        const li = enter(h('li'))
+        const li = bulk ? h('li') : enter(h('li'))
         li.append(h('time'), iconSpan(null), h('span', 'tx'))
         return li
       },
@@ -782,6 +833,30 @@
       },
     )
     ticker.hidden = lines.length === 0
+    if (stick) ticker.scrollTop = ticker.scrollHeight
+    // Show all: when the run logged more than the ticker shows. A peer on an older plugin sends
+    // no count, and no way to ask for the rest: its runs keep the short log only.
+    const total = run.logCount
+    const more = total != null && total > run.log.length
+    logbar.hidden = !full && !more
+    if (!logbar.hidden) {
+      const [note, button] = logbar.children
+      setText(button, full ? 'Show fewer' : `Show all ${total.toLocaleString()} events`)
+      button.setAttribute('aria-expanded', full ? 'true' : 'false')
+      const dropped = full && total != null ? Math.max(logState.dropped || 0, total - lines.length) : 0
+      const noteText = !full
+        ? ''
+        : logState.error
+          ? logState.error
+          : logState.loading && !logState.lines.length
+            ? 'Loading…'
+            : dropped
+              ? `The last ${lines.length.toLocaleString()} · ${dropped.toLocaleString()} older not kept`
+              : `All ${lines.length.toLocaleString()} events`
+      setText(note, noteText)
+      toggle(note, 'bad', Boolean(full && logState.error))
+      note.hidden = !noteText
+    }
     if (glide) {
       for (const li of ticker.children) {
         const was = glide.get(li.dataset.key)
@@ -811,6 +886,43 @@
     countTo(count, spent, tokens)
     const tailText = budget ? ` / ${tokens(budget)} tokens` : ' tokens'
     if (tail.nodeValue !== tailText) tail.nodeValue = tailText
+  }
+
+  // ── The full log ───────────────────────────────────────
+  /** Opens a run's whole log (every line its worker keeps), or closes it back to the ticker. */
+  function toggleLog(key) {
+    if (ui.logs.has(key)) {
+      ui.logs.delete(key)
+      render()
+      return
+    }
+    ui.logs.set(key, { lines: [], dropped: 0, count: null, loading: false, error: null, again: false, stick: true })
+    render()
+    void loadLog(key)
+  }
+  async function loadLog(key) {
+    const st = ui.logs.get(key)
+    const run = findRun(key)
+    if (!st || !run) return
+    if (st.loading) {
+      st.again = true
+      return
+    }
+    st.loading = true
+    const count = run.logCount
+    try {
+      const data = await orca.plugin.request('watch.log', { runId: run.id, host: run.host || null, engine: engineOf(run) }, { timeoutMs: run.host ? 20000 : 8000 })
+      if (ui.logs.get(key) === st) Object.assign(st, { lines: Array.isArray(data.lines) ? data.lines : [], dropped: data.dropped || 0, count, error: null })
+    } catch (error) {
+      // An older paired server has no full log to give: the short one stays, with why.
+      if (ui.logs.get(key) === st) Object.assign(st, { error: error.message || String(error), count })
+    }
+    st.loading = false
+    if (ui.logs.get(key) === st && st.again) {
+      st.again = false
+      return loadLog(key)
+    }
+    render()
   }
 
   // ── Agent sheet ────────────────────────────────────────
@@ -1391,6 +1503,7 @@
     const present = new Set(snap.runs.map(runKey))
     for (const key of [...ui.seen.keys()]) if (!present.has(key)) ui.seen.delete(key)
     for (const key of [...ui.open]) if (!present.has(key)) ui.open.delete(key)
+    for (const key of [...ui.logs.keys()]) if (!present.has(key)) ui.logs.delete(key)
     for (const id of [...ui.openGroups]) if (!present.has(id.replace(/^fold:/, ''))) ui.openGroups.delete(id)
     render()
   }
@@ -1429,6 +1542,7 @@
       if (node.dataset.since) setClock(node, now - Number(node.dataset.since))
     }
     for (const node of document.querySelectorAll('[data-ago]')) setText(node, ago(Number(node.dataset.ago)))
+    for (const node of document.querySelectorAll('[data-tick]')) if (node.dataset.tick) setText(node, WW.duration(now - Number(node.dataset.tick)))
     placeFlows(false)
     if (ui.sheet) {
       const run = findRun(ui.sheet.key)

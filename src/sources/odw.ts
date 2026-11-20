@@ -87,6 +87,12 @@ export class OdwSource implements RunSource {
     if (!runWatch) throw Object.assign(new Error(`no ODW run ${runId} is being watched`), { code: 'invalid_params' })
     return readAgent(runWatch.dir, runId, agentId)
   }
+
+  log(runId: string) {
+    const runWatch = this.watches.get(runId)
+    if (!runWatch) throw Object.assign(new Error(`no ODW run ${runId} is being watched`), { code: 'invalid_params' })
+    return runWatch.log()
+  }
 }
 
 /** A run id as ODW issues it, safe on a command line as it is: nothing a shell reads. */

@@ -263,6 +263,10 @@ html.stale .clock .elapsed { opacity: .45; }
 .band .bh .n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .band .bh .cmd { color: var(--muted); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .band .bh .cmd.bad { color: var(--bad); }
+.band .bh .dur { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.band .bh .cmd:empty + .dur { margin-left: auto; }
+.band .bh .cmd:not(:empty) + .dur:not(:empty)::before { content: '· '; }
+.band.p-active .bh .dur { color: var(--fg); }
 .lanes { display: flex; flex-direction: column; gap: 2px; }
 .lanes:empty { display: none; }
 .lane { display: grid; grid-template-columns: var(--gutter) minmax(0, 1fr); align-items: center; height: 12px; }
@@ -371,6 +375,18 @@ button.bar:hover { background: color-mix(in srgb, var(--b) 100%, var(--fg) 25%);
 .ticker li.t-error .ico { color: var(--bad); }
 .ticker li.t-warn .tx { color: var(--warn); }
 .ticker li.t-error .tx { color: var(--bad); }
+/* Show all: every line the run keeps, in a box that scrolls; newest at the bottom. */
+.ticker.full {
+  max-height: 240px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  padding: 6px 8px; border-radius: 6px; background: var(--soft);
+}
+.ticker.full li .tx, .ticker.full li:last-child .tx { white-space: normal; display: block; overflow-wrap: anywhere; }
+.logbar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--space-item); font-size: var(--t-micro); color: var(--muted); min-width: 0; }
+.logbar .log-note { min-width: 0; font-variant-numeric: tabular-nums; }
+.logbar .log-note.bad { color: var(--warn); }
+.logbar .log-toggle { margin-left: auto; }
+.ticker + .logbar { margin-top: calc(var(--space-tight) - var(--space-group)); }
+.logbar + .meter, .ticker + .logbar[hidden] + .meter { margin-top: calc(var(--space-tight) - var(--space-group)); }
 @keyframes tick { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
 .meter { display: flex; align-items: center; gap: var(--space-item); font-size: var(--t-meta); color: var(--muted); }
 .meter .track { flex: 1; height: 4px; border-radius: 2px; background: var(--idle); overflow: hidden; }
