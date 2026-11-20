@@ -1,4 +1,4 @@
-// Workflow Watch — the panel's pure helpers: how long each phase took, and the full log's
+// Orca Workflow Watch — the panel's pure helpers: how long each phase took, and the full log's
 // window. No DOM here, so the tests load this file as it is (src/panel.test.ts); the panel
 // reads it as window.WorkflowWatch before app.js.
 ;((root) => {

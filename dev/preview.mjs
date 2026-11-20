@@ -4,7 +4,8 @@
 //
 //   node --import ./dev/register.mjs dev/preview.mjs --root /tmp/odw-demo [--port 4517]
 //        [--agentprism ~/.agentprism/workflows]                       AgentPrism runs too
-//        [--remote /tmp/odw-server-runs [--remote-name "Mac mini"]]   a fake paired server
+//        [--remote /tmp/odw-server-runs [--remote-name "Mac mini"] [--remote-key local.odw-watch|none]]
+//                                                                     a fake paired server
 //   then open http://127.0.0.1:4517/  (?theme=light for the light theme)
 //
 // The page gets a window.orca with plugin.request (POST /request) and plugin.on (server-sent
@@ -28,6 +29,8 @@ const settings = { runsRoot: opt('root', '~/.odw/runs'), agentprismRoot: opt('ag
 if (opt('remote', null)) {
   process.env.FAKE_ORCA_ROOT = opt('remote', null)
   process.env.FAKE_ORCA_NAME = opt('remote-name', 'Mac mini')
+  // --remote-key local.odw-watch: a server still on the old name; none: one without the plugin.
+  if (opt('remote-key', null)) process.env.FAKE_ORCA_KEY = opt('remote-key', null)
   settings.orcaCli = join(here, 'fake-orca')
 }
 

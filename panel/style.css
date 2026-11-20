@@ -1,4 +1,4 @@
-/* Workflow Watch — the Workflows panel. Every colour comes from Orca's theme variables, plus four
+/* Orca Workflow Watch — the Workflows panel. Every colour comes from Orca's theme variables, plus four
    status hues that are tuned per light and dark theme. */
 :root {
   --bg: var(--orca-background, #0c0c0e);

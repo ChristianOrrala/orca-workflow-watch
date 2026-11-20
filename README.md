@@ -1,4 +1,4 @@
-# Workflow Watch
+# Orca Workflow Watch
 
 An Orca plugin that shows workflow runs live in the right sidebar, from two engines side by side: [Open Dynamic Workflows](https://github.com/xz1220/open-dynamic-workflows) (ODW) and [AgentPrism Workflows](https://github.com/agentprism/agentprism-workflows).
 
@@ -52,7 +52,19 @@ orca plugin dev load ./orca-workflow-watch --approve <fingerprint> --json
 # later: git pull, then orca plugin dev reload ./orca-workflow-watch
 ```
 
-The panel then lists each paired server in its header; one without the plugin reads "not set up".
+The panel then lists each paired server in its header; one without the plugin reads "not set up". A server still on the old name (`odw-watch`, up to 0.1.4) is asked under its old key, so mixed versions see each other until every server is renamed.
+
+### Renamed from odw-watch
+
+Up to 0.1.4 the plugin was "Workflow Watch", id `odw-watch` (key `local.odw-watch`); from 0.2.0 it is "Orca Workflow Watch", id `orca-workflow-watch` (key `local.orca-workflow-watch`). Orca sees it as a new plugin, so on each computer:
+
+```sh
+orca plugin dev unload <old folder> --json          # the odw-watch checkout, e.g. ./orca-odw-watch
+orca plugin dev load ./orca-workflow-watch --json   # approve the new plugin once, as above
+# installed rather than dev-loaded: orca plugin uninstall <old key>, then install as above
+```
+
+Settings stay with the old key and do not carry over. If you had changed the runs folders, set them again (in the plugin's settings or the panel footer): **Runs folder** (ODW) and **AgentPrism runs folder**. Paired servers to watch, the Orca CLI path, Notify me and Finished runs to show start at their defaults too.
 
 ## Access it asks for
 

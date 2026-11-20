@@ -157,7 +157,7 @@ test('the full log of a run on a paired server is asked of that server; an older
       }
       return ok({ result: { runs: [] } })
     },
-    pluginKey: () => 'local.odw-watch',
+    pluginKeys: () => ['local.orca-workflow-watch', 'local.odw-watch'],
     wanted: () => 'auto',
     onChange: () => undefined,
   })
@@ -168,7 +168,7 @@ test('the full log of a run on a paired server is asked of that server; an older
   assert.equal(asked[asked.indexOf('--data') + 1], '{"runId":"r1","engine":"agentprism"}')
   assert.equal(asked[asked.indexOf('--environment') + 1], 'env-mini')
   old = true
-  await assert.rejects(remote.runLog('env-mini', 'r1'), (e: Error & { code?: string }) => e.code === 'not_supported' && /older Workflow Watch/.test(e.message))
+  await assert.rejects(remote.runLog('env-mini', 'r1'), (e: Error & { code?: string }) => e.code === 'not_supported' && /older Orca Workflow Watch/.test(e.message))
   await assert.rejects(remote.runLog('nowhere', 'r1'), (e: Error & { code?: string }) => e.code === 'invalid_params')
 })
 
@@ -199,5 +199,5 @@ test('the log dialog says what it shows: every line, the last 500 of more, loadi
   // The snapshot's newer lines can grow the count past what the worker said it dropped.
   assert.equal(note({ total: 1650, shown: 500, dropped: 1100 }), 'The last 500 · 1,150 older not kept')
   assert.equal(note({ total: 642, shown: 3, loading: true }), 'Loading…')
-  assert.equal(note({ total: 642, shown: 3, error: 'Mac mini runs an older Workflow Watch, which sends only the latest lines' }), 'Mac mini runs an older Workflow Watch, which sends only the latest lines')
+  assert.equal(note({ total: 642, shown: 3, error: 'Mac mini runs an older Orca Workflow Watch, which sends only the latest lines' }), 'Mac mini runs an older Orca Workflow Watch, which sends only the latest lines')
 })

@@ -23,7 +23,7 @@ function cutEvents(runs: string, type: string, keep = true) {
 
 /** A copy of the fixture store whose demo-review run is rewritten by `edit`. */
 function variant(edit: (runs: string, json: Record<string, unknown>) => Record<string, unknown>) {
-  const root = mkdtempSync(join(tmpdir(), 'odw-watch-ap-'))
+  const root = mkdtempSync(join(tmpdir(), 'orca-workflow-watch-ap-'))
   cpSync(fixtures, root, { recursive: true })
   const path = join(runsDir(root), 'mwof4hgc-8kfg7f.json')
   writeFileSync(path, JSON.stringify(edit(runsDir(root), JSON.parse(readFileSync(path, 'utf8')))))

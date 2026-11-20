@@ -22,8 +22,12 @@ import { expandHome, shortHome } from './sources/paths'
 
 const DEFAULT_ROOT = '~/.odw/runs'
 const DEFAULT_AGENTPRISM_ROOT = '~/.agentprism/workflows'
-const PLUGIN_KEY = 'local.odw-watch'
-const STATUS_ITEM = 'odw'
+/**
+ * This plugin's key on a paired server, newest first: a server still on the plugin's old name
+ * (odw-watch, up to 0.1.4) answers to the old one, so mixed versions still see each other.
+ */
+const PLUGIN_KEYS = ['local.orca-workflow-watch', 'local.odw-watch']
+const STATUS_ITEM = 'workflows'
 const FAST_MS = 1000
 const SLOW_MS = 5000
 const REMOTE_TICK_MS = 1000
@@ -109,7 +113,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   let run = cliRunner(findOrcaCli(null))
   const remote = new RemoteHosts({
     run: (args, timeoutMs) => run(args, timeoutMs),
-    pluginKey: () => PLUGIN_KEY,
+    pluginKeys: () => PLUGIN_KEYS,
     wanted: () => remotesWanted,
     onChange: () => publish(),
     log: (message) => orca.log(message),

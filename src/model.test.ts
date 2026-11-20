@@ -40,7 +40,7 @@ test('a real ODW dry run reads as a finished run with its phases and agents', ()
 })
 
 test('the simulator writes runs the model reads: done, failed, newest first', () => {
-  const root = mkdtempSync(join(tmpdir(), 'odw-watch-sim-'))
+  const root = mkdtempSync(join(tmpdir(), 'orca-workflow-watch-sim-'))
   try {
     execFileSync(process.execPath, [join(here, '..', 'scripts', 'simulate-run.mjs'), '--root', root, '--history-only'], { stdio: 'ignore' })
     const views = listRunDirs(root).map((r) => new RunWatch(r.runId, r.dir).refresh(dead))
@@ -76,7 +76,7 @@ function liveRun(root: string) {
 }
 
 test('a live run follows its events as they land, a torn last line waits', () => {
-  const root = mkdtempSync(join(tmpdir(), 'odw-watch-live-'))
+  const root = mkdtempSync(join(tmpdir(), 'orca-workflow-watch-live-'))
   try {
     const { dir, status, emit } = liveRun(root)
     const watch = new RunWatch('20261119-120000-abc123', dir)
@@ -114,7 +114,7 @@ test('a live run follows its events as they land, a torn last line waits', () =>
 })
 
 test('a replaced events file starts the fold again', () => {
-  const root = mkdtempSync(join(tmpdir(), 'odw-watch-tail-'))
+  const root = mkdtempSync(join(tmpdir(), 'orca-workflow-watch-tail-'))
   try {
     const path = join(root, 'events.jsonl')
     writeFileSync(path, '{"type":"a"}\n{"type":"b"}\n')
@@ -173,7 +173,7 @@ test('a real plan-flow run: a halt that asks or errs is not read as plain done',
 
 test('a question stays open until a newer run of the same plan follows, whatever other plans start', async () => {
   const { needsYou } = await import('./worker')
-  const root = mkdtempSync(join(tmpdir(), 'odw-watch-subject-'))
+  const root = mkdtempSync(join(tmpdir(), 'orca-workflow-watch-subject-'))
   try {
     let second = 0
     const make = (args: unknown, status: string | null) => {

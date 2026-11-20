@@ -2,7 +2,7 @@
 // calls the worker makes (environment list, plugin dev request … --environment) from a runs
 // folder on this computer, read with the plugin's own model: the real CLI path, minus Orca.
 //
-//   FAKE_ORCA_ROOT=<runs folder> FAKE_ORCA_NAME="Mac mini" dev/fake-orca environment list --json
+//   FAKE_ORCA_ROOT=<runs folder> FAKE_ORCA_NAME="Mac mini" [FAKE_ORCA_KEY=local.odw-watch|none] dev/fake-orca environment list --json
 import { join } from 'node:path'
 import { listRunDirs, readAgent, RunWatch } from '../src/model.ts'
 
@@ -18,6 +18,13 @@ if (args[0] === 'environment' && args[1] === 'list') {
   const data = JSON.parse(args[args.indexOf('--data') + 1] ?? 'null')
   if (process.env.FAKE_ORCA_OFFLINE) {
     out({ ok: false, error: { code: 'runtime_unreachable', message: `could not connect to ${name}` } })
+    process.exit(1)
+  }
+  // The plugin key the fake server's copy answers to: local.odw-watch plays a server still on
+  // the old name, none one without the plugin.
+  const key = process.env.FAKE_ORCA_KEY ?? 'local.orca-workflow-watch'
+  if (args[3] !== key) {
+    out({ ok: false, error: { code: 'plugin_not_found', message: `${args[3]} is not loaded on ${name}` } })
     process.exit(1)
   }
   const dirs = listRunDirs(root).slice(0, 12)

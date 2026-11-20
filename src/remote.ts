@@ -53,7 +53,7 @@ export function cliRunner(cli: string): CliRunner {
     })
 }
 
-interface CliEnvelope {
+export interface CliEnvelope {
   ok?: boolean
   result?: unknown
   error?: { code?: string; message?: string; data?: { requestCode?: string } }
@@ -85,8 +85,22 @@ export function classify(envelope: CliEnvelope): { state: HostStatus['state']; e
   return { state: 'error', error: message }
 }
 
+/**
+ * The server answered, but no plugin by that key is loaded there: worth asking again under
+ * another key (a server still on the plugin's old name). An approval or consent error means the
+ * plugin is there and is not retried.
+ */
+export function pluginMissing(envelope: CliEnvelope): boolean {
+  if (envelope.ok) return false
+  const code = envelope.error?.code
+  if (code === 'approval_required' || code === 'consent_required') return false
+  return code === 'plugin_not_found' || /not.{0,4}(found|loaded|installed)|loaded development plugin|unknown plugin|no plugin/i.test(envelope.error?.message ?? '')
+}
+
 interface Source {
   env: Environment
+  /** The plugin key this server last answered to; null until one did. */
+  key: string | null
   status: HostStatus
   snapshot: Snapshot | null
   next: number
@@ -100,14 +114,18 @@ export class RemoteHosts {
   private envsAt = 0
   private envsBusy = false
   private readonly run: CliRunner
-  private readonly pluginKey: () => string
+  private readonly pluginKeys: () => string[]
   private readonly wanted: () => string
   private readonly onChange: () => void
   private readonly log: (message: string) => void
 
-  constructor(opts: { run: CliRunner; pluginKey: () => string; wanted: () => string; onChange: () => void; log?: (message: string) => void }) {
+  /**
+   * `pluginKeys`: the keys this plugin answers to on a server, newest first. A server still on an
+   * older name answers to an older key; each server keeps the one it last answered to.
+   */
+  constructor(opts: { run: CliRunner; pluginKeys: () => string[]; wanted: () => string; onChange: () => void; log?: (message: string) => void }) {
     this.run = opts.run
-    this.pluginKey = opts.pluginKey
+    this.pluginKeys = opts.pluginKeys
     this.wanted = opts.wanted
     this.onChange = opts.onChange
     this.log = opts.log ?? (() => undefined)
@@ -185,6 +203,7 @@ export class RemoteHosts {
       this.sources.set(env.id, {
         env,
         status: { id: env.id, name: env.name, state: 'connecting', error: null, lastSeen: null },
+        key: null,
         snapshot: null,
         next: 0,
         failures: 0,
@@ -195,14 +214,35 @@ export class RemoteHosts {
     if (changed) this.onChange()
   }
 
-  private async poll(source: Source): Promise<void> {
-    source.busy = true
-    try {
+  /**
+   * Asks a server's copy of this plugin: under the key it last answered to, then the others in
+   * order while the answer is that no such plugin is loaded. Answers the first other reply, or
+   * the reply to the newest key when none has the plugin.
+   */
+  private async request(source: Source, method: string, data: unknown): Promise<CliEnvelope> {
+    const keys = this.pluginKeys()
+    const order = source.key && keys.includes(source.key) ? [source.key, ...keys.filter((k) => k !== source.key)] : keys
+    const missing = new Map<string, CliEnvelope>()
+    for (const key of order) {
       const out = await this.run(
-        ['plugin', 'dev', 'request', this.pluginKey(), 'watch.snapshot', '--data', '{"localOnly":true}', '--environment', source.env.id, '--timeout-ms', '10000', '--json'],
+        ['plugin', 'dev', 'request', key, method, '--data', JSON.stringify(data), '--environment', source.env.id, '--timeout-ms', '10000', '--json'],
         CALL_TIMEOUT_MS,
       )
       const envelope = parse(out)
+      if (!pluginMissing(envelope)) {
+        if (source.key !== key) this.log(`${source.env.name}: answers as ${key}`)
+        source.key = key
+        return envelope
+      }
+      missing.set(key, envelope)
+    }
+    return missing.get(keys[0]) ?? { ok: false, error: { code: 'plugin_not_found', message: 'no plugin key to ask' } }
+  }
+
+  private async poll(source: Source): Promise<void> {
+    source.busy = true
+    try {
+      const envelope = await this.request(source, 'watch.snapshot', { localOnly: true })
       const snapshot = (envelope.result as { result?: Snapshot } | undefined)?.result
       const before = JSON.stringify([source.status.state, source.snapshot?.runs])
       if (envelope.ok && snapshot && Array.isArray(snapshot.runs)) {
@@ -230,11 +270,7 @@ export class RemoteHosts {
   async agent(hostId: string, runId: string, agentId: number, engine: EngineId = 'odw'): Promise<AgentDetail> {
     const source = this.sources.get(hostId)
     if (!source) throw Object.assign(new Error(`no paired server ${hostId}`), { code: 'invalid_params' })
-    const out = await this.run(
-      ['plugin', 'dev', 'request', this.pluginKey(), 'watch.agent', '--data', JSON.stringify(engine === 'odw' ? { runId, agentId } : { runId, agentId, engine }), '--environment', hostId, '--timeout-ms', '10000', '--json'],
-      CALL_TIMEOUT_MS,
-    )
-    const envelope = parse(out)
+    const envelope = await this.request(source, 'watch.agent', engine === 'odw' ? { runId, agentId } : { runId, agentId, engine })
     const detail = (envelope.result as { result?: AgentDetail } | undefined)?.result
     if (!envelope.ok || !detail) throw Object.assign(new Error(classify(envelope).error), { code: 'action_failed' })
     return detail
@@ -247,15 +283,11 @@ export class RemoteHosts {
   async runLog(hostId: string, runId: string, engine: EngineId = 'odw'): Promise<RunLog> {
     const source = this.sources.get(hostId)
     if (!source) throw Object.assign(new Error(`no paired server ${hostId}`), { code: 'invalid_params' })
-    const out = await this.run(
-      ['plugin', 'dev', 'request', this.pluginKey(), 'watch.log', '--data', JSON.stringify(engine === 'odw' ? { runId } : { runId, engine }), '--environment', hostId, '--timeout-ms', '10000', '--json'],
-      CALL_TIMEOUT_MS,
-    )
-    const envelope = parse(out)
+    const envelope = await this.request(source, 'watch.log', engine === 'odw' ? { runId } : { runId, engine })
     const log = envelope.ok ? normalizeLog((envelope.result as { result?: unknown } | undefined)?.result, runId) : null
     if (log) return log
     if (envelope.error?.data?.requestCode === 'unknown_method' || /no handler|unknown (method|request)/i.test(envelope.error?.message ?? ''))
-      throw Object.assign(new Error(`${source.env.name} runs an older Workflow Watch, which sends only the latest lines`), { code: 'not_supported' })
+      throw Object.assign(new Error(`${source.env.name} runs an older Orca Workflow Watch, which sends only the latest lines`), { code: 'not_supported' })
     throw Object.assign(new Error(classify(envelope).error), { code: 'action_failed' })
   }
 }

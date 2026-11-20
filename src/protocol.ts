@@ -122,7 +122,7 @@ export interface Outcome {
 export interface HostStatus {
   id: string
   name: string
-  /** `no-plugin`: the server answers but has no Workflow Watch loaded to ask. */
+  /** `no-plugin`: the server answers but has no Orca Workflow Watch loaded to ask. */
   state: 'connecting' | 'ok' | 'offline' | 'no-plugin' | 'error'
   error: string | null
   lastSeen: number | null
