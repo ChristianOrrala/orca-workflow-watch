@@ -33,24 +33,15 @@ Adding an engine is one more `RunSource` in the worker's list.
 
 ## Install
 
-Needs Orca 1.4.248 or newer. Orca installs it as `<publisher>.workflow-watch-orca`; the publisher comes from where you install it, so `orca plugin list` shows the key to use with `orca plugin update`.
-
-**From Orca's community catalog:** open [its directory page](https://orca.dev/plugins/christianorrala.workflow-watch-orca?catalog=community) and press Install in Orca, or from a terminal:
+Needs Orca 1.4.248 or newer. Install Workflow Watch from the publisher’s `ChristianOrrala/agents` catalog on the computer whose runs you want to watch.
 
 ```sh
-orca plugin install christianorrala.workflow-watch-orca --catalog community
-```
-
-**From the ChristianOrrala/agents catalog:**
-
-```sh
-orca plugin catalog add ChristianOrrala/agents          # answers approval_required: re-run with --approve <fingerprint>
+orca plugin catalog add ChristianOrrala/agents
 orca plugin install christianorrala.workflow-watch-orca
-# Orca answers approval_required with the exact command to run again with --approve <fingerprint>.
 orca plugin update christianorrala.workflow-watch-orca   # later
 ```
 
-Both install as `christianorrala.workflow-watch-orca`, and an install updates only from the catalog it came from (with both catalogs added, pick one with `--catalog`). `orca plugin install ChristianOrrala/orca-workflow-watch` also works, straight from the repository's newest version tag, unverified. Each install watches the runs on the computer it is on.
+If Orca answers `approval_required`, run the command it prints with `--approve <fingerprint>` before continuing.
 
 **With paired Orca servers:** the plugin must also run on each server, loaded there as a development folder (key `local.workflow-watch-orca`), because the worker asks a paired server through `orca plugin dev request`, which reaches only development plugins (Orca refuses it for installed ones). On each server (or from your computer, with `--environment <server>` and the server's absolute path):
 
