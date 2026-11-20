@@ -13,6 +13,7 @@ const lib = createRequire(import.meta.url)('../panel/lib.js') as {
   phaseLabel(t: unknown): string
   mergeLog(full: unknown[], tail: unknown[]): { ts: number; text: string }[]
   atBottom(scrollTop: number, clientHeight: number, scrollHeight: number): boolean
+  logNote(o: { total: number; shown: number; dropped: number; loading: boolean; error: string | null }): string
 }
 
 const alive = () => true
@@ -188,4 +189,15 @@ test('the open log follows new lines only while it is left at the bottom', () =>
   assert.equal(lib.atBottom(754, 240, 1000), true, 'within a few pixels counts')
   assert.equal(lib.atBottom(600, 240, 1000), false, 'scrolled up: it stays put')
   assert.equal(lib.atBottom(0, 240, 120), true, 'a log shorter than its box')
+})
+
+test('the log dialog says what it shows: every line, the last 500 of more, loading, or why not', () => {
+  const note = (o: Partial<Parameters<typeof lib.logNote>[0]>) => lib.logNote({ total: 0, shown: 0, dropped: 0, loading: false, error: null, ...o })
+  assert.equal(note({ total: 42, shown: 42 }), 'All 42 events')
+  assert.equal(note({ total: 1, shown: 1 }), 'All 1 event')
+  assert.equal(note({ total: 642, shown: 500, dropped: 142 }), 'The last 500 · 142 older not kept')
+  // The snapshot's newer lines can grow the count past what the worker said it dropped.
+  assert.equal(note({ total: 1650, shown: 500, dropped: 1100 }), 'The last 500 · 1,150 older not kept')
+  assert.equal(note({ total: 642, shown: 3, loading: true }), 'Loading…')
+  assert.equal(note({ total: 642, shown: 3, error: 'Mac mini runs an older Workflow Watch, which sends only the latest lines' }), 'Mac mini runs an older Workflow Watch, which sends only the latest lines')
 })

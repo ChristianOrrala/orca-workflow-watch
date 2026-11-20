@@ -34,7 +34,7 @@
     counts: new Map(), // tally word -> last count, so a change can ping
     prevCards: new Set(), // run keys that were live cards at the last paint: a row for one is filing
     observed: new Set(), // cards watched for scrolling out of view
-    logs: new Map(), // run key -> { lines, dropped, count, loading, error, again, stick }: an open full log
+    log: null, // the open full-log dialog: { key, lines, dropped, count, loading, error, again, stick, opener }
   }
 
   // ── Small helpers ──────────────────────────────────────
@@ -658,14 +658,11 @@
     const flow = createFlow()
     const sheet = h('div', 'sheet-slot')
     const ticker = h('ul', 'ticker')
-    ticker.addEventListener('scroll', () => {
-      const st = ui.logs.get(card.dataset.run)
-      if (st && ticker.classList.contains('full')) st.stick = WW.atBottom(ticker.scrollTop, ticker.clientHeight, ticker.scrollHeight)
-    })
     const logbar = h('div', 'logbar')
     const logToggle = h('button', 'link log-toggle')
     logToggle.type = 'button'
-    logbar.append(h('span', 'log-note'), logToggle)
+    logToggle.setAttribute('aria-haspopup', 'dialog')
+    logbar.append(logToggle)
     const meter = h('div', 'meter')
     const track = h('div', 'track')
     track.append(h('div', 'fill'))
@@ -674,8 +671,9 @@
     meter.append(track, txt)
     card.append(head, desc, ask, lost, flow, sheet, ticker, logbar, meter)
     card.addEventListener('click', (event) => {
-      if (event.target.closest('.log-toggle')) {
-        toggleLog(card.dataset.run)
+      const opener = event.target.closest('.log-toggle')
+      if (opener) {
+        openLog(card.dataset.run, opener)
         return
       }
       const bar = event.target.closest('button.bar, .show-agent')
@@ -786,76 +784,19 @@
 
     renderSheet(sheetSlot, run)
 
-    // Ticker: the last lines the run logged; a new one slides in and the rest glide up. Open
-    // (Show all), it is every line the run keeps, in a box that scrolls, newest at the bottom.
-    // Keyed by time, text and occurrence: two equal lines in one millisecond are two rows.
-    const logState = ui.logs.get(key) || null
-    const full = Boolean(logState)
-    let shownLog = run.log
-    if (logState) {
-      // The snapshot's newer lines follow the fetched ones; a gap the snapshot cannot fill
-      // (more new lines than it carries) asks the worker again.
-      shownLog = WW.mergeLog(logState.lines, run.log).slice(-LOG_MAX)
-      if (logState.count != null && run.logCount != null && run.logCount - logState.count > run.log.length && !logState.error) {
-        if (logState.loading) logState.again = true
-        else queueMicrotask(() => loadLog(key))
-      }
-    }
-    const seenLines = new Map()
-    const lines = shownLog.map((l) => {
-      const base = `${l.ts}:${l.text}`
-      const n = (seenLines.get(base) || 0) + 1
-      seenLines.set(base, n)
-      return { ...l, key: `${base}#${n}` }
-    })
-    toggle(ticker, 'full', full)
-    // Left at the bottom, the open log follows new lines; scrolled up, it stays put.
-    const stick = full && logState.stick !== false
-    // Opening it adds hundreds of lines at once: those arrive still, not one by one.
-    const bulk = full && lines.length - ticker.children.length > 8
-    const glide = !full && !ticker.hidden && !calm() && !booting() ? new Map([...ticker.children].map((li) => [li.dataset.key, li.getBoundingClientRect().top])) : null
-    reconcile(
-      ticker,
-      lines,
-      (l) => l.key,
-      () => {
-        const li = bulk ? h('li') : enter(h('li'))
-        li.append(h('time'), iconSpan(null), h('span', 'tx'))
-        return li
-      },
-      (li, l) => {
-        setState(li, 't-', l.tone)
-        setText(li.firstChild, hhmm(l.ts))
-        // Warnings and errors carry a shape as well as a colour.
-        setIcon(li.children[1], l.tone === 'warn' ? 'warn' : l.tone === 'error' ? 'failed' : null)
-        setText(li.lastChild, l.text)
-        li.title = l.text
-      },
-    )
+    // Ticker: the last lines the run logged; a new one slides in and the rest glide up.
+    const lines = keyedLines(run.log)
+    const glide = !ticker.hidden && !calm() && !booting() ? new Map([...ticker.children].map((li) => [li.dataset.key, li.getBoundingClientRect().top])) : null
+    reconcile(ticker, lines, (l) => l.key, () => createLogLine(true), updateLogLine)
     ticker.hidden = lines.length === 0
-    if (stick) ticker.scrollTop = ticker.scrollHeight
     // Show all: when the run logged more than the ticker shows. A peer on an older plugin sends
     // no count, and no way to ask for the rest: its runs keep the short log only.
     const total = run.logCount
-    const more = total != null && total > run.log.length
-    logbar.hidden = !full && !more
+    logbar.hidden = !(total != null && total > run.log.length)
     if (!logbar.hidden) {
-      const [note, button] = logbar.children
-      setText(button, full ? 'Show fewer' : `Show all ${total.toLocaleString()} events`)
-      button.setAttribute('aria-expanded', full ? 'true' : 'false')
-      const dropped = full && total != null ? Math.max(logState.dropped || 0, total - lines.length) : 0
-      const noteText = !full
-        ? ''
-        : logState.error
-          ? logState.error
-          : logState.loading && !logState.lines.length
-            ? 'Loading…'
-            : dropped
-              ? `The last ${lines.length.toLocaleString()} · ${dropped.toLocaleString()} older not kept`
-              : `All ${lines.length.toLocaleString()} events`
-      setText(note, noteText)
-      toggle(note, 'bad', Boolean(full && logState.error))
-      note.hidden = !noteText
+      const button = logbar.firstChild
+      setText(button, `Show all ${total.toLocaleString()} events`)
+      button.setAttribute('aria-expanded', ui.log && ui.log.key === key ? 'true' : 'false')
     }
     if (glide) {
       for (const li of ticker.children) {
@@ -888,22 +829,132 @@
     if (tail.nodeValue !== tailText) tail.nodeValue = tailText
   }
 
-  // ── The full log ───────────────────────────────────────
-  /** Opens a run's whole log (every line its worker keeps), or closes it back to the ticker. */
-  function toggleLog(key) {
-    if (ui.logs.has(key)) {
-      ui.logs.delete(key)
-      render()
-      return
-    }
-    ui.logs.set(key, { lines: [], dropped: 0, count: null, loading: false, error: null, again: false, stick: true })
+  // ── Log lines ──────────────────────────────────────────
+  /** Keyed by time, text and occurrence: two equal lines in one millisecond are two rows. */
+  function keyedLines(log) {
+    const seen = new Map()
+    return log.map((l) => {
+      const base = `${l.ts}:${l.text}`
+      const n = (seen.get(base) || 0) + 1
+      seen.set(base, n)
+      return { ...l, key: `${base}#${n}` }
+    })
+  }
+  function createLogLine(animate) {
+    const li = animate ? enter(h('li')) : h('li')
+    li.append(h('time'), iconSpan(null), h('span', 'tx'))
+    return li
+  }
+  function updateLogLine(li, l) {
+    setState(li, 't-', l.tone)
+    setText(li.firstChild, hhmm(l.ts))
+    // Warnings and errors carry a shape as well as a colour.
+    setIcon(li.children[1], l.tone === 'warn' ? 'warn' : l.tone === 'error' ? 'failed' : null)
+    setText(li.lastChild, l.text)
+    li.title = l.text
+  }
+
+  // ── The full log, in a dialog ──────────────────────────
+  /** The one dialog, made the first time it opens: a title, a note, every line, and Close. */
+  function logDialog() {
+    let dlg = document.getElementById('logdlg')
+    if (dlg) return dlg
+    dlg = h('dialog', 'logdlg')
+    dlg.id = 'logdlg'
+    dlg.setAttribute('aria-modal', 'true')
+    dlg.setAttribute('aria-labelledby', 'logdlg-title')
+    dlg.setAttribute('aria-describedby', 'logdlg-note')
+    const top = h('div', 'ld-head')
+    const titles = h('div', 'ld-titles')
+    const title = h('h2', 'ld-title')
+    title.id = 'logdlg-title'
+    titles.append(title, h('p', 'ld-sub'))
+    const x = h('button', 'x')
+    x.type = 'button'
+    x.append(iconSpan('close'))
+    x.setAttribute('aria-label', 'Close the log')
+    x.title = 'Close (Esc)'
+    top.append(titles, x)
+    const note = h('p', 'ld-note')
+    note.id = 'logdlg-note'
+    const list = h('ul', 'ticker full')
+    list.tabIndex = 0
+    list.setAttribute('aria-label', 'Every event the run kept, oldest first')
+    list.addEventListener('scroll', () => {
+      if (ui.log) ui.log.stick = WW.atBottom(list.scrollTop, list.clientHeight, list.scrollHeight)
+    })
+    dlg.append(top, note, list)
+    x.addEventListener('click', () => closeLog())
+    // A click on the backdrop lands on the dialog itself, outside its box.
+    dlg.addEventListener('click', (event) => {
+      if (event.target !== dlg) return
+      const r = dlg.getBoundingClientRect()
+      const inside = event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom
+      if (!inside) closeLog()
+    })
+    // Esc: the browser closes a modal dialog; this keeps the state in step.
+    dlg.addEventListener('cancel', (event) => {
+      event.preventDefault()
+      closeLog()
+    })
+    document.body.append(dlg)
+    return dlg
+  }
+  /** Opens a run's whole log (every line its worker keeps) over the panel. */
+  function openLog(key, opener) {
+    ui.log = { key, lines: [], dropped: 0, count: null, loading: false, error: null, again: false, stick: true, opener }
+    const dlg = logDialog()
+    dlg.querySelector('.ticker').replaceChildren()
+    renderLog()
+    if (!dlg.open) dlg.showModal()
+    dlg.querySelector('.ticker').focus()
     render()
     void loadLog(key)
   }
+  function closeLog() {
+    const was = ui.log
+    ui.log = null
+    const dlg = document.getElementById('logdlg')
+    if (dlg && dlg.open) dlg.close()
+    render()
+    // Back to the button it came from; redrawn since, it is found again by its run.
+    const back = was && was.opener && was.opener.isConnected ? was.opener : was && document.getElementById(`card-${was.key}`)?.querySelector('.log-toggle')
+    if (back) back.focus()
+  }
+  /** Draws the open dialog from the fetched lines and the snapshot's newer ones. */
+  function renderLog() {
+    const st = ui.log
+    const dlg = document.getElementById('logdlg')
+    if (!st || !dlg) return
+    const run = findRun(st.key)
+    // A run that left the snapshot keeps what was fetched.
+    const tail = run ? run.log : []
+    if (run) st.run = run
+    const shown = st.run || run
+    if (!shown) return
+    // A gap the snapshot cannot fill (more new lines than it carries) asks the worker again.
+    if (run && st.count != null && run.logCount != null && run.logCount - st.count > run.log.length && !st.error) {
+      if (st.loading) st.again = true
+      else queueMicrotask(() => loadLog(st.key))
+    }
+    const lines = keyedLines(WW.mergeLog(st.lines, tail).slice(-LOG_MAX))
+    setText(dlg.querySelector('.ld-title'), shown.workflow)
+    setText(dlg.querySelector('.ld-sub'), [hostLabel(shown), shown.subjectLabel, look(shown).word].filter(Boolean).join(' · '))
+    const note = dlg.querySelector('.ld-note')
+    const total = shown.logCount != null ? shown.logCount : lines.length
+    setText(note, WW.logNote({ total, shown: lines.length, dropped: st.dropped, loading: st.loading && !st.lines.length, error: st.error }))
+    toggle(note, 'bad', Boolean(st.error))
+    const list = dlg.querySelector('.ticker')
+    // Opening adds hundreds of lines at once: those arrive still; later ones slide in.
+    const bulk = lines.length - list.children.length > 8
+    reconcile(list, lines, (l) => l.key, () => createLogLine(!bulk), updateLogLine)
+    // Left at the bottom, the log follows new lines; scrolled up, it stays put.
+    if (st.stick !== false) list.scrollTop = list.scrollHeight
+  }
   async function loadLog(key) {
-    const st = ui.logs.get(key)
+    const st = ui.log
     const run = findRun(key)
-    if (!st || !run) return
+    if (!st || st.key !== key || !run) return
     if (st.loading) {
       st.again = true
       return
@@ -912,17 +963,17 @@
     const count = run.logCount
     try {
       const data = await orca.plugin.request('watch.log', { runId: run.id, host: run.host || null, engine: engineOf(run) }, { timeoutMs: run.host ? 20000 : 8000 })
-      if (ui.logs.get(key) === st) Object.assign(st, { lines: Array.isArray(data.lines) ? data.lines : [], dropped: data.dropped || 0, count, error: null })
+      if (ui.log === st) Object.assign(st, { lines: Array.isArray(data.lines) ? data.lines : [], dropped: data.dropped || 0, count, error: null })
     } catch (error) {
       // An older paired server has no full log to give: the short one stays, with why.
-      if (ui.logs.get(key) === st) Object.assign(st, { error: error.message || String(error), count })
+      if (ui.log === st) Object.assign(st, { error: error.message || String(error), count })
     }
     st.loading = false
-    if (ui.logs.get(key) === st && st.again) {
+    if (ui.log === st && st.again) {
       st.again = false
       return loadLog(key)
     }
-    render()
+    renderLog()
   }
 
   // ── Agent sheet ────────────────────────────────────────
@@ -1442,6 +1493,7 @@
       },
     )
     renderFoot()
+    renderLog()
     watchOffscreen(list)
     ui.prevCards = new Set(items.filter((it) => it.kind === 'card' && !it.expanded).map((it) => runKey(it.run)))
   }
@@ -1503,7 +1555,6 @@
     const present = new Set(snap.runs.map(runKey))
     for (const key of [...ui.seen.keys()]) if (!present.has(key)) ui.seen.delete(key)
     for (const key of [...ui.open]) if (!present.has(key)) ui.open.delete(key)
-    for (const key of [...ui.logs.keys()]) if (!present.has(key)) ui.logs.delete(key)
     for (const id of [...ui.openGroups]) if (!present.has(id.replace(/^fold:/, ''))) ui.openGroups.delete(id)
     render()
   }
@@ -1521,7 +1572,8 @@
     render()
   })
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && ui.sheet && !ui.editing) closeSheet(true)
+    // With the log open, Esc is the dialog's: it closes the log, not the agent sheet behind it.
+    if (event.key === 'Escape' && ui.sheet && !ui.editing && !ui.log) closeSheet(true)
   })
   document.addEventListener('click', (event) => {
     const button = event.target.closest('button.copy')

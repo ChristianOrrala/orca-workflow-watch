@@ -102,7 +102,20 @@
     return scrollHeight - scrollTop - clientHeight <= 8
   }
 
-  const api = { duration, phaseTimes, phaseLabel, mergeLog, atBottom }
+  /**
+   * The line under the log dialog's title: why it shows only the short log, that it is still
+   * loading, how many older lines the worker no longer keeps, or that this is every line.
+   */
+  function logNote({ total, shown, dropped, loading, error }) {
+    if (error) return error
+    if (loading) return 'Loading…'
+    const gone = Math.max(dropped || 0, (total || 0) - shown)
+    const n = (x) => x.toLocaleString('en-US')
+    if (gone > 0) return `The last ${n(shown)} · ${n(gone)} older not kept`
+    return `All ${n(shown)} event${shown === 1 ? '' : 's'}`
+  }
+
+  const api = { duration, phaseTimes, phaseLabel, mergeLog, atBottom, logNote }
   root.WorkflowWatch = api
   if (typeof module === 'object' && module && module.exports) module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

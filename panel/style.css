@@ -375,16 +375,37 @@ button.bar:hover { background: color-mix(in srgb, var(--b) 100%, var(--fg) 25%);
 .ticker li.t-error .ico { color: var(--bad); }
 .ticker li.t-warn .tx { color: var(--warn); }
 .ticker li.t-error .tx { color: var(--bad); }
-/* Show all: every line the run keeps, in a box that scrolls; newest at the bottom. */
+/* Show all: every line the run keeps, in a dialog over the panel; newest at the bottom. */
+.logdlg {
+  box-sizing: border-box; width: calc(100vw - 16px); max-width: 640px; height: calc(100vh - 16px); max-height: none;
+  margin: auto; padding: var(--space-group); border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); color: var(--fg); font-family: var(--sans);
+  flex-direction: column; gap: var(--space-item); overflow: hidden;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+}
+.logdlg[open] { display: flex; }
+.logdlg::backdrop { background: color-mix(in srgb, var(--bg) 60%, transparent); backdrop-filter: blur(2px); }
+.logdlg .ld-head { display: flex; align-items: flex-start; gap: var(--space-item); min-width: 0; }
+.logdlg .ld-titles { flex: 1 1 auto; min-width: 0; }
+.logdlg .ld-title { margin: 0; font-size: var(--t-title); font-weight: 600; overflow-wrap: anywhere; }
+.logdlg .ld-sub { margin: 2px 0 0; font-size: var(--t-meta); color: var(--muted); overflow-wrap: anywhere; }
+.logdlg .ld-note { margin: 0; font-size: var(--t-micro); color: var(--muted); font-variant-numeric: tabular-nums; }
+.logdlg .ld-note.bad { color: var(--warn); }
+.logdlg .x {
+  margin: -4px -6px 0 0; width: 28px; height: 28px; flex: none;
+  display: grid; place-items: center; border: 0; border-radius: 6px;
+  background: none; cursor: pointer; color: var(--muted);
+}
+.logdlg .x:hover { color: var(--fg); background: var(--fill); }
+.logdlg .x:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.logdlg .x .ico { width: 12px; height: 12px; }
 .ticker.full {
-  max-height: 240px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin;
   padding: 6px 8px; border-radius: 6px; background: var(--soft);
 }
+.ticker.full:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .ticker.full li .tx, .ticker.full li:last-child .tx { white-space: normal; display: block; overflow-wrap: anywhere; }
-.logbar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--space-item); font-size: var(--t-micro); color: var(--muted); min-width: 0; }
-.logbar .log-note { min-width: 0; font-variant-numeric: tabular-nums; }
-.logbar .log-note.bad { color: var(--warn); }
-.logbar .log-toggle { margin-left: auto; }
+.logbar { display: flex; justify-content: flex-end; font-size: var(--t-micro); color: var(--muted); min-width: 0; }
 .ticker + .logbar { margin-top: calc(var(--space-tight) - var(--space-group)); }
 .logbar + .meter, .ticker + .logbar[hidden] + .meter { margin-top: calc(var(--space-tight) - var(--space-group)); }
 @keyframes tick { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
