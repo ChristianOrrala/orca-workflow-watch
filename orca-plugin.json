@@ -3,8 +3,8 @@
   "manifestVersion": 2,
   "id": "workflow-watch-orca",
   "name": "Workflow Watch for Orca",
-  "version": "0.3.1",
-  "description": "Shows Open Dynamic Workflows and AgentPrism Workflows runs live in the right sidebar, on this computer and on every paired server: phases, every agent as it works, the run's log, tokens, and a notification when a run finishes or waits for you. Read-only. A community plugin, not made or endorsed by Orca or Stably.",
+  "version": "0.3.2",
+  "description": "Every workflow run, live, beside your code. Watch Open Dynamic Workflows and AgentPrism runs in Orca's sidebar, from this computer and your paired servers: each phase and agent on a timeline, the whole run log, and a notification when a run finishes or needs you. A community plugin, not made or endorsed by Orca.",
   "author": {
     "name": "Christian Orrala",
     "url": "https://github.com/ChristianOrrala"
@@ -15,28 +15,28 @@
   "icon": "assets/icon.png",
   "cover": {
     "path": "assets/cover.png",
-    "alt": "Workflow Watch beside two real panel views showing a live review and completed runs."
+    "alt": "The headline “Every workflow run, live, beside your code.” beside the Workflows panel: a live run on its timeline and two recent runs."
   },
   "screenshots": [
     {
       "path": "assets/live.png",
-      "caption": "Follow a live run",
-      "alt": "Dark Workflows panel showing parallel review agents on the running phase timeline."
+      "caption": "Watch agents work in parallel",
+      "alt": "Dark Workflows panel with a live review-swarm run: five review agents as bars on the timeline, the phases to come and a token meter."
     },
     {
       "path": "assets/finished.png",
-      "caption": "Compare phase durations",
-      "alt": "Expanded review-swarm history card in the light theme with individual phase durations and agent bars."
+      "caption": "See where the time went",
+      "alt": "Light Workflows panel with a finished review-swarm run opened: how long each phase took, a skipped Apply phase, and a bar for every agent."
     },
     {
       "path": "assets/log.png",
-      "caption": "Read the full event log",
-      "alt": "The plan-flow event log in a dialog showing a failed gate, task completions and a question for the owner."
+      "caption": "Read the whole run log",
+      "alt": "A plan-flow run's full event log in a dialog: completed tasks, a failed test gate, a failed reviewer, and a question waiting for the owner."
     },
     {
       "path": "assets/paired.png",
-      "caption": "Watch paired servers",
-      "alt": "Run history in the light theme with MacBook Pro and Mac mini named as the sources."
+      "caption": "Two machines. One run history.",
+      "alt": "Light Workflows panel listing recent runs from a MacBook Pro and a Mac mini, each with its phases as a metro line, and a chip for each computer."
     }
   ],
   "engines": {
