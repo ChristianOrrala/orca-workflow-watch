@@ -1,0 +1,52 @@
+{
+  "agentId": 2,
+  "label": "review:correctness",
+  "phase": "Review",
+  "prompt": "Review the uncommitted changes in this repository (run `git diff HEAD` to see them) strictly through the lens of correctness. Context from a first pass:\n\nFiles: \nRisks: \n\nReport only concrete, verifiable problems (with file and line when you can). No style nits unless the lens is readability.",
+  "adapter": "mock",
+  "model": null,
+  "options": {
+    "schema": {
+      "type": "object",
+      "required": [
+        "findings"
+      ],
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "severity",
+              "rationale"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "number"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "label": "review:correctness"
+  }
+}

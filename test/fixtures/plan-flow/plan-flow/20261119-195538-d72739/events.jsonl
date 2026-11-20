@@ -1,0 +1,60 @@
+{"ts":1795139738.389,"type":"run_started","runId":"20261119-195538-d72739","setup":{"settings":{"defaultAdapter":"worker","permissions":"edit","trust":"trusted","concurrency":null,"maxAgents":1000,"timeout":1800,"stallTimeout":null,"stallRestarts":1,"transientRetries":3,"maxBackoff":300,"schemaRetries":2,"worktreeSetup":null,"worktreeSetupTimeout":600,"adaptiveConcurrency":true,"staggerFanOut":{"first":1,"delayMs":2500},"agentEnv":"inherit","agentEnvPass":[],"schemaKeywords":"warn","schemaPrompt":"auto","fallback":{},"handoff":false,"models":{},"quotaBreaker":3,"quotaWait":false,"expectRetries":1,"permissionDenials":"warn","mcpFailures":"warn","orphanedBackground":"warn","scopePolicy":"warn","questions":"checkpoint","destructiveGit":"warn","modelMismatch":"warn","scriptContext":"host","sandbox":"none","notes":false,"memory":false,"agentLimits":{},"costGate":null},"adapters":{"agy":"ce17224ff1f7","claude":"ddd1902e108f","codex":"9fbbc84963f0","cursor":"e5a55eb8f2d6","gemini":"71af0a133128","kilo":"b3f63eab9471","kimi":"7199e0502647","mock":"4997dbd06110","reviewer":"3c5859be37fa","worker":"5111e225f44c","omp":"4131cfd04b50","opencode":"ec656217836b","qwen":"98425951c650"}}}
+{"ts":1795139738.391,"type":"log","message":"a dry run: every agent gets a stub reply, no model is called (ODW extension)"}
+{"ts":1795139738.428,"type":"log","message":"workflow file 'flow.js' declares meta.name 'plan-flow'; run it by name as 'flow'"}
+{"ts":1795139738.43,"type":"phase_started","phase":"Preflight"}
+{"ts":1795139738.43,"type":"log","message":"reading test-driven-development: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading receiving-code-review: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading impeccable: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading code-review: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading subagent-driven-development: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading code-review: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading subagent-driven-development: not found — the built-in text is used"}
+{"ts":1795139738.431,"type":"log","message":"reading requesting-code-review: not found — the built-in text is used"}
+{"ts":1795139738.432,"type":"log","message":"reading plan-step: not found — the built-in text is used"}
+{"ts":1795139738.432,"type":"log","message":"task briefs: built in"}
+{"ts":1795139738.475,"type":"log","message":"Ready — 3 task(s), base sim0, branch feature/demo"}
+{"ts":1795139738.476,"type":"log","message":"difficulty: 1 easy, 2 normal — no step is named for easy tasks, so they use the normal one"}
+{"ts":1795139738.476,"type":"log","message":"implementer time limit: the adapter's own timeout"}
+{"ts":1795139738.476,"type":"log","message":"no step is named for a last round: a finding that is never fixed is put off without one"}
+{"ts":1795139738.476,"type":"phase_started","phase":"Tasks"}
+{"ts":1795139738.478,"type":"agent_started","agentId":1,"label":"implement:1:1","phase":"Tasks","adapter":"worker","permissions":"edit","key":"a3862e05268498bfcf5911b6802f0adf19506e407a86f9682f1fcb2358df65aa"}
+{"ts":1795139738.493,"type":"agent_finished","agentId":1,"label":"implement:1:1","phase":"Tasks","adapter":"worker","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.493,"type":"log","message":"review package: built in"}
+{"ts":1795139738.494,"type":"agent_started","agentId":2,"label":"review:conformance:1:1","phase":"Tasks","adapter":"reviewer","permissions":"edit","limits":{"seconds":1800},"key":"7d12bf40de17bed54f12cb2df6bd4e4a003499cec1dc885fe0b85b023107d552"}
+{"ts":1795139738.494,"type":"agent_started","agentId":3,"label":"review:adversarial:1:1","phase":"Tasks","adapter":"reviewer","permissions":"edit","limits":{"seconds":1800},"key":"c0bf99bd359eec15c2d5895ae2e2afec0a377dee3dc0a078ea8141f35b11e0a9"}
+{"ts":1795139738.496,"type":"agent_finished","agentId":2,"label":"review:conformance:1:1","phase":"Tasks","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.496,"type":"agent_finished","agentId":3,"label":"review:adversarial:1:1","phase":"Tasks","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.496,"type":"fanout_done","call":"parallel()","phase":"Tasks","total":2,"ok":2,"failed":0,"null":0,"reasons":{}}
+{"ts":1795139738.496,"type":"log","message":"Task 1 complete — Add the parser — 1 attempt(s)"}
+{"ts":1795139738.497,"type":"agent_started","agentId":4,"label":"implement:2:1","phase":"Tasks","adapter":"worker","permissions":"edit","key":"5f8a5585eb69a1edb4bce4ba12c71b3a271eb460239944de2043de2827378f5c"}
+{"ts":1795139738.497,"type":"agent_finished","agentId":4,"label":"implement:2:1","phase":"Tasks","adapter":"worker","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.497,"type":"log","message":"review package: built in"}
+{"ts":1795139738.498,"type":"agent_started","agentId":5,"label":"review:conformance:2:1","phase":"Tasks","adapter":"reviewer","permissions":"edit","limits":{"seconds":1800},"key":"34fe8690b8c954e1544cf988448075b75222de86efe3189c177e410859bcd623"}
+{"ts":1795139738.498,"type":"agent_started","agentId":6,"label":"review:adversarial:2:1","phase":"Tasks","adapter":"reviewer","permissions":"edit","limits":{"seconds":1800},"key":"fca71db535610351db9d3fda9fea3d023d0bb55e8d647d0228a15f5f660d8f95"}
+{"ts":1795139738.499,"type":"agent_finished","agentId":5,"label":"review:conformance:2:1","phase":"Tasks","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.499,"type":"agent_finished","agentId":6,"label":"review:adversarial:2:1","phase":"Tasks","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.499,"type":"fanout_done","call":"parallel()","phase":"Tasks","total":2,"ok":2,"failed":0,"null":0,"reasons":{}}
+{"ts":1795139738.499,"type":"log","message":"Task 2 complete — Wire the API — 1 attempt(s)"}
+{"ts":1795139738.499,"type":"agent_started","agentId":7,"label":"implement:3:1","phase":"Tasks","adapter":"worker","permissions":"edit","key":"eba72dd36f1f03350acb0ad36f77e2af5b9757f7df6079349ff1559b74f03c12"}
+{"ts":1795139738.5,"type":"agent_finished","agentId":7,"label":"implement:3:1","phase":"Tasks","adapter":"worker","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.5,"type":"log","message":"review package: built in"}
+{"ts":1795139738.5,"type":"agent_started","agentId":8,"label":"review:conformance:3:1","phase":"Tasks","adapter":"reviewer","permissions":"edit","limits":{"seconds":1800},"key":"2e40d89f565ee93512f5be5c732422132897797dea44e14099fb0e49bef89bcd"}
+{"ts":1795139738.501,"type":"agent_started","agentId":9,"label":"review:adversarial:3:1","phase":"Tasks","adapter":"reviewer","permissions":"edit","limits":{"seconds":1800},"key":"e1b48233bce21bd7d929744cda8ea6ab177d23c33e399a2f60c933192e9187c5"}
+{"ts":1795139738.502,"type":"agent_finished","agentId":9,"label":"review:adversarial:3:1","phase":"Tasks","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.502,"type":"agent_finished","agentId":8,"label":"review:conformance:3:1","phase":"Tasks","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.502,"type":"fanout_done","call":"parallel()","phase":"Tasks","total":2,"ok":2,"failed":0,"null":0,"reasons":{}}
+{"ts":1795139738.502,"type":"log","message":"Task 3 complete — Tests — 1 attempt(s)"}
+{"ts":1795139738.502,"type":"phase_started","phase":"Integration review"}
+{"ts":1795139738.503,"type":"log","message":"review package: built in"}
+{"ts":1795139738.503,"type":"agent_started","agentId":10,"label":"review:integration:1","phase":"Integration review","adapter":"reviewer","permissions":"edit","limits":{"seconds":3600},"key":"98a09fdf5993241b34e9bc6263abb0e9767ccace606eefffa5d752cba5048aa8"}
+{"ts":1795139738.504,"type":"agent_finished","agentId":10,"label":"review:integration:1","phase":"Integration review","adapter":"reviewer","attempts":1,"usage":{"outputTokens":8,"estimated":true},"saved":true}
+{"ts":1795139738.504,"type":"fanout_done","call":"parallel()","phase":"Integration review","total":1,"ok":1,"failed":0,"null":0,"reasons":{}}
+{"ts":1795139738.504,"type":"log","message":"Integration review passed in round 1"}
+{"ts":1795139738.504,"type":"log","message":"Build stage complete — 3 task(s), 0 finding(s) deferred, 0 never fixed, 0 late, 0 flag(s); the test check was answered from the cache 0 of 0 time(s)"}
+{"ts":1795139738.504,"type":"phase_started","phase":"Merge"}
+{"ts":1795139738.505,"type":"log","message":"final gates: the cache is not skipped (force_suffix is NONE)"}
+{"ts":1795139738.505,"type":"checkpoint_requested","checkpointId":1,"title":"Merge feature/demo into dev?","payload":{"plan":"Plan: demo","commits":"","files_changed":0,"deferred_findings":0,"late_findings":0,"never_fixed_findings":0,"flags":0,"gates_passed_at":"sim3","base_checkout":"none — the merge runs in this checkout","base_checkout_uncommitted_files":[]},"phase":"Merge"}
+{"ts":1795139991.835,"type":"checkpoint_resolved","checkpointId":1,"approved":true,"note":null,"by":"cli","who":"cli:someone <someone@example.com>"}
+{"ts":1795139991.835,"type":"log","message":"merge: feature/demo into dev"}
+{"ts":1795139991.836,"type":"log","message":"Merged feature/demo into dev at "}
+{"ts":1795139991.836,"type":"run_finished","runId":"20261119-195538-d72739"}

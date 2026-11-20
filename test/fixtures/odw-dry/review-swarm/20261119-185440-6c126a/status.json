@@ -1,0 +1,25 @@
+{
+  "runId": "20261119-185440-6c126a",
+  "state": "done",
+  "dispatched": 6,
+  "updatedAt": 1795136081.625,
+  "pid": 43594,
+  "pidStart": "ps:Fri Nov 20 00:54:40 2026",
+  "name": "review-swarm",
+  "description": "Review a change set through several lenses in parallel, verify every finding independently, and keep only what survives.",
+  "phases": [
+    {
+      "title": "Map"
+    },
+    {
+      "title": "Review"
+    },
+    {
+      "title": "Verify"
+    },
+    {
+      "title": "Summarize"
+    }
+  ],
+  "spentTokens": 25
+}

@@ -1,0 +1,88 @@
+{
+  "runId": "mwof5s0r-fka77p",
+  "workflowName": "fail-demo",
+  "script": "export const meta = { name: \"fail-demo\", description: \"Script throws\" };\nawait agent(\"x\", { label: \"x\" });\nthrow new Error(\"boom in script\");",
+  "scriptOrigin": {
+    "kind": "inline"
+  },
+  "args": {},
+  "effectiveCwd": "/work/demo",
+  "runtime": {
+    "engineVersion": "4.0.5",
+    "node": "v26.8.1",
+    "v8": "14.6.202.34-node.28",
+    "pathFormat": 1,
+    "inputsFormat": 2,
+    "checkpointInputsFormat": 2
+  },
+  "resume": {
+    "format": "identity-v1"
+  },
+  "eventStreamId": "a0a1135aeccdf3884d758df3a5a7fcc7",
+  "eventSeq": 6,
+  "journal": [
+    {
+      "index": 0,
+      "hash": "c94b5d0d86ea8df65f08ae88b27766d720a774e41b55352c7e19272d55b452af",
+      "result": "ok",
+      "kind": "agent",
+      "scope": "mwof5s0r-fka77p",
+      "call": {
+        "kind": "agent",
+        "label": "x"
+      }
+    }
+  ],
+  "calls": [
+    {
+      "index": 0,
+      "kind": "agent",
+      "hash": "c94b5d0d86ea8df65f08ae88b27766d720a774e41b55352c7e19272d55b452af",
+      "path": "2:7<4:3",
+      "inputsHash": "f43a5197dc8aefc0065ab1a75fe3c36b828fa9375b2d06ef65dc01b243a1afcb",
+      "label": "x",
+      "outcome": "result",
+      "origin": "runner",
+      "attempts": 1,
+      "resolvedCwd": "/work/demo",
+      "settlementOrdinal": 1,
+      "scope": "mwof5s0r-fka77p"
+    }
+  ],
+  "callsAllocated": 1,
+  "limits": {
+    "maxAgents": 1000,
+    "concurrency": 8,
+    "agentRetries": 0
+  },
+  "status": "failed",
+  "reason": "boom in script",
+  "errorCode": "SCRIPT_ERROR",
+  "phases": [],
+  "agents": [
+    {
+      "id": 1,
+      "label": "x",
+      "prompt": "x",
+      "status": "done",
+      "callIndex": 0,
+      "scope": "mwof5s0r-fka77p",
+      "resultPreview": "ok",
+      "tokens": 2,
+      "startedAt": "2026-11-20T03:28:16.926Z",
+      "endedAt": "2026-11-20T03:28:19.968Z"
+    }
+  ],
+  "logs": [],
+  "tokenUsage": {
+    "input": 0,
+    "output": 0,
+    "total": 2,
+    "cost": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "startedAt": "2026-11-20T03:28:16.926Z",
+  "updatedAt": "2026-11-20T03:28:19.968Z",
+  "durationMs": 3023
+}

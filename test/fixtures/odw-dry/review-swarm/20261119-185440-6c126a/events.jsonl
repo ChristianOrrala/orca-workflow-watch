@@ -1,0 +1,22 @@
+{"ts":1795136081.478,"type":"run_started","runId":"20261119-185440-6c126a","setup":{"settings":{"defaultAdapter":"mock","permissions":"edit","trust":"trusted","concurrency":null,"maxAgents":1000,"timeout":1800,"stallTimeout":null,"stallRestarts":1,"transientRetries":3,"maxBackoff":300,"schemaRetries":2,"worktreeSetup":null,"worktreeSetupTimeout":600,"adaptiveConcurrency":true,"staggerFanOut":{"first":1,"delayMs":2500},"agentEnv":"inherit","agentEnvPass":[],"schemaKeywords":"warn","schemaPrompt":"auto","fallback":{},"handoff":false,"models":{},"quotaBreaker":3,"quotaWait":false,"expectRetries":1,"permissionDenials":"warn","mcpFailures":"warn","orphanedBackground":"warn","scopePolicy":"warn","questions":"checkpoint","destructiveGit":"warn","modelMismatch":"warn","scriptContext":"host","sandbox":"none","notes":false,"memory":false,"agentLimits":{},"costGate":null},"adapters":{"agy":"ce17224ff1f7","claude":"ddd1902e108f","codex":"9fbbc84963f0","cursor":"e5a55eb8f2d6","gemini":"71af0a133128","kilo":"b3f63eab9471","kimi":"7199e0502647","mock":"4997dbd06110","omp":"4131cfd04b50","opencode":"ec656217836b","qwen":"98425951c650"}}}
+{"ts":1795136081.48,"type":"log","message":"a dry run: every agent gets a stub reply, no model is called (ODW extension)"}
+{"ts":1795136081.587,"type":"phase_started","phase":"Map"}
+{"ts":1795136081.592,"type":"agent_started","agentId":1,"label":"map","phase":"Map","adapter":"mock","permissions":"edit","key":"0a7a2af3f3ffd6fe81c44fcbd291f6fe658a28f28ebf736c6a29f7c2a1ea87fc"}
+{"ts":1795136081.609,"type":"agent_finished","agentId":1,"label":"map","phase":"Map","adapter":"mock","attempts":1,"usage":{"outputTokens":7,"estimated":true},"saved":true}
+{"ts":1795136081.61,"type":"phase_started","phase":"Review"}
+{"ts":1795136081.612,"type":"agent_started","agentId":2,"label":"review:correctness","phase":"Review","adapter":"mock","permissions":"edit","key":"6714f3de92d41a32da04631df7ebc62d51827df63f7644e8c62640a8c74834e7"}
+{"ts":1795136081.612,"type":"agent_started","agentId":3,"label":"review:security","phase":"Review","adapter":"mock","permissions":"edit","key":"89e3d10cf8664034c4b5eb377989c84f805baa5e1cd030eea4b923c294fd44b1"}
+{"ts":1795136081.613,"type":"agent_started","agentId":4,"label":"review:performance","phase":"Review","adapter":"mock","permissions":"edit","key":"287c63dc565d07844b0f7eaeb6926e36f6e83031c0d0722ca912d5e108c4b5b8"}
+{"ts":1795136081.614,"type":"agent_started","agentId":5,"label":"review:readability","phase":"Review","adapter":"mock","permissions":"edit","key":"0f3c61c43cc98f99e5255d26432757c85766ecba5c09f53c585602fb9076395c"}
+{"ts":1795136081.615,"type":"agent_started","agentId":6,"label":"review:tests","phase":"Review","adapter":"mock","permissions":"edit","key":"fef1ace5c7587717a8aff51e904efd808ad009ca026fc71d4e521d8e7a2bdafd"}
+{"ts":1795136081.62,"type":"agent_finished","agentId":2,"label":"review:correctness","phase":"Review","adapter":"mock","attempts":1,"usage":{"outputTokens":4,"estimated":true},"saved":true}
+{"ts":1795136081.62,"type":"agent_finished","agentId":3,"label":"review:security","phase":"Review","adapter":"mock","attempts":1,"usage":{"outputTokens":4,"estimated":true},"saved":true}
+{"ts":1795136081.621,"type":"agent_finished","agentId":4,"label":"review:performance","phase":"Review","adapter":"mock","attempts":1,"usage":{"outputTokens":4,"estimated":true},"saved":true}
+{"ts":1795136081.621,"type":"agent_finished","agentId":5,"label":"review:readability","phase":"Review","adapter":"mock","attempts":1,"usage":{"outputTokens":4,"estimated":true},"saved":true}
+{"ts":1795136081.622,"type":"agent_finished","agentId":6,"label":"review:tests","phase":"Review","adapter":"mock","attempts":1,"usage":{"outputTokens":4,"estimated":true},"saved":true}
+{"ts":1795136081.623,"type":"fanout_done","call":"parallel()","phase":"Review","total":5,"ok":5,"failed":0,"null":0,"reasons":{}}
+{"ts":1795136081.623,"type":"log","message":"0 candidate findings from 5 lenses"}
+{"ts":1795136081.623,"type":"phase_started","phase":"Verify"}
+{"ts":1795136081.624,"type":"phase_started","phase":"Summarize"}
+{"ts":1795136081.624,"type":"log","message":"0 of 0 findings survived verification"}
+{"ts":1795136081.625,"type":"run_finished","runId":"20261119-185440-6c126a"}

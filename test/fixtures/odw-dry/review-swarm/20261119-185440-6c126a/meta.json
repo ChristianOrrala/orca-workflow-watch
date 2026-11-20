@@ -1,0 +1,19 @@
+{
+  "runId": "20261119-185440-6c126a",
+  "args": null,
+  "configPath": null,
+  "source": "/repo/demo",
+  "budgetTotal": null,
+  "workflowName": "review-swarm",
+  "adapter": null,
+  "permissions": null,
+  "origin": null,
+  "dry": true,
+  "launchedBy": "someone@example.com",
+  "resumedFrom": null,
+  "resumedFromDir": null,
+  "inline": false,
+  "odwVersion": "0.5.0-dev+gbaf2c8ed5d49",
+  "sourceHash": "61a42ca9ad2ff72b0d45b3bad26cdf5e6bd32137515b81884ec18e8080e8ddd6",
+  "createdAt": 1795136080.794
+}

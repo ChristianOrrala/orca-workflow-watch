@@ -1,0 +1,177 @@
+{
+  "runId": "mwof4xwn-nry4kn",
+  "workflowName": "limit-demo",
+  "script": "export const meta = { name: \"limit-demo\", description: \"Hits a usage limit\", phases: [{ title: \"Work\" }] };\nphase(\"Work\");\nawait agent(\"first\", { label: \"first\", model: \"claude/sonnet\" });\nawait agent(\"LIMIT now\", { label: \"second\" });\nreturn 1;",
+  "scriptOrigin": {
+    "kind": "inline"
+  },
+  "args": {},
+  "effectiveCwd": "/work/demo",
+  "runtime": {
+    "engineVersion": "4.0.5",
+    "node": "v26.8.1",
+    "v8": "14.6.202.34-node.28",
+    "pathFormat": 1,
+    "inputsFormat": 2,
+    "checkpointInputsFormat": 2
+  },
+  "resume": {
+    "format": "identity-v1"
+  },
+  "eventStreamId": "d0599a1f158f7907fae1c44a1acbb8ed",
+  "eventSeq": 12,
+  "journal": [
+    {
+      "index": 0,
+      "hash": "7da835090a71fadfc571dcf8f339598d6c8f5e50758668c6a430148c86cb2d00",
+      "result": "ok",
+      "kind": "agent",
+      "scope": "mwof4xwn-nry4kn",
+      "usage": {
+        "input": 50,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 55,
+        "cost": 0
+      },
+      "call": {
+        "kind": "agent",
+        "label": "first",
+        "phase": "Work",
+        "model": "claude/sonnet"
+      }
+    }
+  ],
+  "calls": [
+    {
+      "index": 0,
+      "kind": "agent",
+      "hash": "7da835090a71fadfc571dcf8f339598d6c8f5e50758668c6a430148c86cb2d00",
+      "path": "3:7<6:3",
+      "inputsHash": "f75a5384a92deff641d090b6377fecc34ccdc4cb7725afb2f05fb0b0ce374831",
+      "label": "first",
+      "modelRequested": "claude/sonnet",
+      "outcome": "result",
+      "origin": "runner",
+      "attempts": 1,
+      "usage": {
+        "input": 50,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 55,
+        "cost": 0
+      },
+      "resolvedCwd": "/work/demo",
+      "settlementOrdinal": 1,
+      "scope": "mwof4xwn-nry4kn"
+    },
+    {
+      "index": 1,
+      "kind": "agent",
+      "hash": "1bb3b9c340a400dd84a1f3fa53598c084f65b77f3f25c915dec0c89b79f27968",
+      "path": "4:7",
+      "inputsHash": "d4b7b0152ef1d69e6df1945a0cf8e341e51044424ef3a2a6483bf04d4a341b17",
+      "label": "second",
+      "outcome": "error",
+      "origin": "runner",
+      "error": {
+        "form": "workflow-error",
+        "message": "usage limit reached",
+        "code": "PROVIDER_USAGE_LIMIT",
+        "recoverable": false,
+        "resetHint": "Resets in ~3h"
+      },
+      "attempts": 1,
+      "usage": {
+        "input": 50,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 55,
+        "cost": 0
+      },
+      "resolvedCwd": "/work/demo",
+      "settlementOrdinal": 2,
+      "scope": "mwof4xwn-nry4kn"
+    }
+  ],
+  "callsAllocated": 2,
+  "limits": {
+    "maxAgents": 1000,
+    "concurrency": 8,
+    "agentRetries": 0
+  },
+  "status": "paused",
+  "reason": "usage_limit",
+  "errorCode": "PROVIDER_USAGE_LIMIT",
+  "pauseReason": "usage_limit",
+  "resetHint": "Resets in ~3h",
+  "phases": [
+    "Work"
+  ],
+  "currentPhase": "Work",
+  "agents": [
+    {
+      "id": 1,
+      "label": "first",
+      "phase": "Work",
+      "prompt": "first",
+      "status": "done",
+      "model": "claude/sonnet",
+      "callIndex": 0,
+      "scope": "mwof4xwn-nry4kn",
+      "resultPreview": "ok",
+      "tokens": 55,
+      "usage": {
+        "input": 50,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 55,
+        "cost": 0
+      },
+      "startedAt": "2026-11-20T03:27:37.898Z",
+      "endedAt": "2026-11-20T03:27:40.959Z"
+    },
+    {
+      "id": 2,
+      "label": "second",
+      "phase": "Work",
+      "prompt": "LIMIT now",
+      "status": "error",
+      "callIndex": 1,
+      "scope": "mwof4xwn-nry4kn",
+      "resultPreview": "null",
+      "error": "usage limit reached",
+      "errorCode": "PROVIDER_USAGE_LIMIT",
+      "recoverable": false,
+      "tokens": 55,
+      "usage": {
+        "input": 50,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 55,
+        "cost": 0
+      },
+      "startedAt": "2026-11-20T03:27:37.898Z",
+      "endedAt": "2026-11-20T03:27:40.959Z"
+    }
+  ],
+  "logs": [
+    "agent second attempt 1/1 failed: usage limit reached"
+  ],
+  "tokenUsage": {
+    "input": 100,
+    "output": 10,
+    "total": 110,
+    "cost": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "startedAt": "2026-11-20T03:27:37.898Z",
+  "updatedAt": "2026-11-20T03:27:40.959Z",
+  "durationMs": 3036
+}

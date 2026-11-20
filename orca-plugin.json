@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
+  "manifestVersion": 2,
+  "id": "odw-watch",
+  "name": "Workflow Watch",
+  "version": "0.1.0",
+  "description": "Watch Open Dynamic Workflows and AgentPrism Workflows runs live in Orca's sidebar, on this computer and on every paired Orca server: phases, every agent as it works, the run's log, tokens, and a nudge when a run finishes or waits for you.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "runs",
+        "title": "Workflows",
+        "icon": "activity",
+        "entry": "panel/index.html",
+        "ui": "html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "odw.toggleSidebar",
+        "title": "Workflow Watch: Show or hide the sidebar",
+        "action": "sidebar.right.toggle"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "odw",
+        "text": "Workflows",
+        "icon": "activity",
+        "tone": "neutral",
+        "tooltip": "Workflow Watch",
+        "command": "odw.toggleSidebar"
+      }
+    ],
+    "settings": [
+      {
+        "key": "runsRoot",
+        "title": "Runs folder",
+        "description": "Where ODW keeps its runs: its runsRoot setting. ODW's default is ~/.odw/runs.",
+        "type": "string",
+        "default": "~/.odw/runs",
+        "placeholder": "~/.odw/runs",
+        "maxLength": 1024
+      },
+      {
+        "key": "agentprismRoot",
+        "title": "AgentPrism runs folder",
+        "description": "Where AgentPrism Workflows keeps its runs: AGENTPRISM_PERSISTENCE_ROOT, or ~/.agentprism/workflows by default.",
+        "type": "string",
+        "default": "~/.agentprism/workflows",
+        "placeholder": "~/.agentprism/workflows",
+        "maxLength": 1024
+      },
+      {
+        "key": "notifications",
+        "title": "Notify me",
+        "description": "A desktop notification when a run finishes, fails or waits at a checkpoint.",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "key": "history",
+        "title": "Finished runs to show",
+        "description": "Live runs always show, however old.",
+        "type": "integer",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 50
+      },
+      {
+        "key": "remotes",
+        "title": "Paired servers to watch",
+        "description": "auto: every paired Orca server that runs this plugin too. Or a comma-separated list of server names, or off.",
+        "type": "string",
+        "default": "auto",
+        "placeholder": "auto",
+        "maxLength": 512
+      },
+      {
+        "key": "orcaCli",
+        "title": "Orca CLI path",
+        "description": "Leave empty to use the CLI inside the Orca app. The worker asks paired servers through it.",
+        "type": "string",
+        "default": "",
+        "placeholder": "/Applications/Orca.app/Contents/Resources/bin/orca",
+        "maxLength": 1024
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "settings:own"
+    },
+    {
+      "kind": "notifications:show"
+    }
+  ]
+}

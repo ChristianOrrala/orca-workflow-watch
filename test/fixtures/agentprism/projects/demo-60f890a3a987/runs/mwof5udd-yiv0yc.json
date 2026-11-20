@@ -1,0 +1,75 @@
+{
+  "runId": "mwof5udd-yiv0yc",
+  "workflowName": "stop-demo",
+  "script": "export const meta = { name: \"stop-demo\", description: \"Stopped by host\" };\nawait agent(\"y\", { label: \"y\" }); return 2;",
+  "scriptOrigin": {
+    "kind": "inline"
+  },
+  "args": {},
+  "effectiveCwd": "/work/demo",
+  "runtime": {
+    "engineVersion": "4.0.5",
+    "node": "v26.8.1",
+    "v8": "14.6.202.34-node.28",
+    "pathFormat": 1,
+    "inputsFormat": 2,
+    "checkpointInputsFormat": 2
+  },
+  "resume": {
+    "format": "identity-v1"
+  },
+  "eventStreamId": "1de78cf813b7c2c6de906c8283cf879d",
+  "eventSeq": 4,
+  "journal": [],
+  "calls": [
+    {
+      "index": 0,
+      "kind": "agent",
+      "hash": "8ab9050a7c52c78b217df527eeece9eab709d76d06dbbbc6111adc3560f12b2a",
+      "path": "2:7<3:3",
+      "inputsHash": "143eb7efcf38d6cb59bd75756593d37e65f836d1655eb767f6f90577fa6ea0ab",
+      "label": "y",
+      "outcome": "error",
+      "origin": "engine",
+      "error": {
+        "form": "workflow-error",
+        "message": "agent \"y\" interrupted because workflow execution halted",
+        "code": "WORKFLOW_ABORTED",
+        "recoverable": true,
+        "agentLabel": "y"
+      },
+      "aborted": true,
+      "settlementOrdinal": 1,
+      "scope": "mwof5udd-yiv0yc"
+    }
+  ],
+  "callsAllocated": 1,
+  "limits": {
+    "maxAgents": 1000,
+    "concurrency": 8,
+    "agentRetries": 0
+  },
+  "abortSignaled": true,
+  "status": "aborted",
+  "phases": [],
+  "agents": [
+    {
+      "id": 1,
+      "label": "y",
+      "prompt": "y",
+      "status": "error",
+      "callIndex": 0,
+      "scope": "mwof5udd-yiv0yc",
+      "resultPreview": "null",
+      "error": "agent \"y\" interrupted because workflow execution halted",
+      "errorCode": "WORKFLOW_ABORTED",
+      "recoverable": true,
+      "tokens": 0,
+      "startedAt": "2026-11-20T03:28:19.969Z",
+      "endedAt": "2026-11-20T03:28:20.490Z"
+    }
+  ],
+  "logs": [],
+  "startedAt": "2026-11-20T03:28:19.969Z",
+  "updatedAt": "2026-11-20T03:28:20.490Z"
+}

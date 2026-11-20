@@ -1,0 +1,321 @@
+{
+  "runId": "mwof4hgc-8kfg7f",
+  "workflowName": "demo-review",
+  "script": "export const meta = {\n  name: \"demo-review\",\n  description: \"Stub demo with phases, agents and a checkpoint\",\n  phases: [{ title: \"Scan\" }, { title: \"Review\" }],\n};\nphase(\"Scan\");\nlog(\"scanning \" + args.repo);\nconst a = await agent(\"Count files in \" + args.repo, { label: \"count\", schema: { type: \"object\", properties: { files: { type: \"number\" } }, required: [\"files\"] } });\nconst [b, c] = await parallel([() => agent(\"Summarize\", { label: \"summary\" }), () => agent(\"FAIL on purpose\", { label: \"broken\" })]);\nphase(\"Review\");\nconst ok = await checkpoint(\"Ship the review for \" + args.repo + \"?\", { kind: \"confirm\" });\nreturn { a, b, c, ok };\n",
+  "scriptOrigin": {
+    "kind": "inline"
+  },
+  "args": {
+    "repo": "demo"
+  },
+  "effectiveCwd": "/work/demo",
+  "runtime": {
+    "engineVersion": "4.0.5",
+    "node": "v26.8.1",
+    "v8": "14.6.202.34-node.28",
+    "pathFormat": 1,
+    "inputsFormat": 2,
+    "checkpointInputsFormat": 2
+  },
+  "resume": {
+    "format": "identity-v1"
+  },
+  "continuation": {
+    "generation": 1,
+    "replayedPrefix": 2,
+    "resolvedCheckpoints": [
+      {
+        "callIndex": 3,
+        "outcome": "accepted",
+        "decision": true
+      }
+    ]
+  },
+  "eventStreamId": "bd3f78f6f9510fcefdbc96140c6e3598",
+  "eventSeq": 40,
+  "legacyResume": true,
+  "journal": [
+    {
+      "index": 0,
+      "hash": "ff89bac82f26345478e7afc81820102f83030256d8b8fd1f7ced5f0c5c218096",
+      "result": {
+        "files": 3,
+        "note": "stub"
+      },
+      "kind": "agent",
+      "scope": "mwof4hgc-8kfg7f",
+      "usage": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 120,
+        "cost": 0
+      },
+      "call": {
+        "kind": "agent",
+        "label": "count",
+        "phase": "Scan"
+      }
+    },
+    {
+      "index": 1,
+      "hash": "8a4faadeb4bef9af7f9805fcf1118471eae6a230d85792f82d6285c5fc8f506c",
+      "result": "stub answer #2",
+      "kind": "agent",
+      "scope": "mwof4hgc-8kfg7f",
+      "usage": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 120,
+        "cost": 0
+      },
+      "call": {
+        "kind": "agent",
+        "label": "summary",
+        "phase": "Scan"
+      }
+    },
+    {
+      "index": 2,
+      "hash": "e4f9a2a407266e1129300b377b96e6e14021a021df2e22f6b6f9f438f1f5284f",
+      "result": "late",
+      "kind": "agent",
+      "scope": "mwof4hgc-8kfg7f",
+      "usage": {
+        "input": 10,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 12,
+        "cost": 0
+      },
+      "call": {
+        "kind": "agent",
+        "label": "broken",
+        "phase": "Scan"
+      }
+    },
+    {
+      "index": 3,
+      "hash": "d47bb0577065b65f1a4d1bcda4054d1188a243a77b8b94ac705229d6e0c2a7ae",
+      "result": true,
+      "kind": "checkpoint",
+      "checkpointDecision": "explicit-v1",
+      "scope": "mwof4hgc-8kfg7f",
+      "call": {
+        "kind": "checkpoint",
+        "label": "checkpoint",
+        "phase": "Review"
+      }
+    }
+  ],
+  "checkpointsTaken": [
+    {
+      "callIndex": 3,
+      "kind": "confirm",
+      "decision": true,
+      "source": "injected"
+    }
+  ],
+  "calls": [
+    {
+      "index": 0,
+      "kind": "agent",
+      "hash": "ff89bac82f26345478e7afc81820102f83030256d8b8fd1f7ced5f0c5c218096",
+      "path": "4:17<10:3",
+      "inputsHash": "7dadd5fba01377c0ed1e7deef41c878c5fae48f7ee5483dcd55a409764eb3445",
+      "label": "count",
+      "outcome": "result",
+      "origin": "journal-replay",
+      "usage": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 120,
+        "cost": 0
+      },
+      "replay": {
+        "sourceRunId": "mwof4hgc-8kfg7f",
+        "recordedIndex": 0,
+        "match": "index-hash"
+      },
+      "settlementOrdinal": 1,
+      "scope": "mwof4hgc-8kfg7f"
+    },
+    {
+      "index": 1,
+      "kind": "agent",
+      "hash": "8a4faadeb4bef9af7f9805fcf1118471eae6a230d85792f82d6285c5fc8f506c",
+      "path": "5:38",
+      "inputsHash": "e748e3a07e552489975ddce5c2c92d33171177e1b6da023eafe7cd9cd5ecf35d",
+      "label": "summary",
+      "outcome": "result",
+      "origin": "journal-replay",
+      "usage": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 120,
+        "cost": 0
+      },
+      "replay": {
+        "sourceRunId": "mwof4hgc-8kfg7f",
+        "recordedIndex": 1,
+        "match": "index-hash"
+      },
+      "settlementOrdinal": 2,
+      "scope": "mwof4hgc-8kfg7f"
+    },
+    {
+      "index": 2,
+      "kind": "agent",
+      "hash": "e4f9a2a407266e1129300b377b96e6e14021a021df2e22f6b6f9f438f1f5284f",
+      "path": "5:86",
+      "inputsHash": "f8f06271f4b302a86501950fd20a97dd34ac5488d3d6741a38e69be30df9be80",
+      "label": "broken",
+      "outcome": "result",
+      "origin": "runner",
+      "attempts": 1,
+      "usage": {
+        "input": 10,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 12,
+        "cost": 0
+      },
+      "resolvedCwd": "/work/demo",
+      "settlementOrdinal": 3,
+      "scope": "mwof4hgc-8kfg7f"
+    },
+    {
+      "index": 3,
+      "kind": "checkpoint",
+      "hash": "d47bb0577065b65f1a4d1bcda4054d1188a243a77b8b94ac705229d6e0c2a7ae",
+      "path": "7:18",
+      "inputsHash": "7216174785cb3b5d11223e76b466afd6d8c0ec78655cea275a4499aac1efa188",
+      "outcome": "result",
+      "origin": "journal-replay",
+      "checkpointDecision": "explicit-v1",
+      "replay": {
+        "sourceRunId": "mwof4hgc-8kfg7f",
+        "recordedIndex": 3,
+        "match": "index-hash",
+        "checkpointHostDecision": true,
+        "checkpointInjected": true
+      },
+      "settlementOrdinal": 4,
+      "scope": "mwof4hgc-8kfg7f"
+    }
+  ],
+  "callsAllocated": 4,
+  "limits": {
+    "maxAgents": 1000,
+    "concurrency": 8,
+    "agentRetries": 0
+  },
+  "status": "completed",
+  "phases": [
+    "Scan",
+    "Review"
+  ],
+  "currentPhase": "Review",
+  "agents": [
+    {
+      "id": 1,
+      "label": "count",
+      "phase": "Scan",
+      "prompt": "Count files in demo",
+      "status": "done",
+      "callIndex": 0,
+      "scope": "mwof4hgc-8kfg7f",
+      "resultPreview": "{\"files\":3,\"note\":\"stub\"}",
+      "tokens": 0,
+      "usage": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 120,
+        "cost": 0
+      },
+      "startedAt": "2026-11-20T03:27:16.575Z",
+      "endedAt": "2026-11-20T03:27:24.943Z"
+    },
+    {
+      "id": 2,
+      "label": "broken",
+      "phase": "Scan",
+      "prompt": "FAIL on purpose",
+      "status": "done",
+      "callIndex": 2,
+      "scope": "mwof4hgc-8kfg7f",
+      "resultPreview": "late",
+      "tokens": 12,
+      "usage": {
+        "input": 10,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 12,
+        "cost": 0
+      },
+      "startedAt": "2026-11-20T03:27:16.575Z",
+      "endedAt": "2026-11-20T03:27:24.943Z"
+    },
+    {
+      "id": 3,
+      "label": "summary",
+      "phase": "Scan",
+      "prompt": "Summarize",
+      "status": "done",
+      "callIndex": 1,
+      "scope": "mwof4hgc-8kfg7f",
+      "resultPreview": "stub answer #2",
+      "tokens": 0,
+      "usage": {
+        "input": 100,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 120,
+        "cost": 0
+      },
+      "startedAt": "2026-11-20T03:27:16.575Z",
+      "endedAt": "2026-11-20T03:27:24.943Z"
+    }
+  ],
+  "logs": [
+    "scanning demo",
+    "agent broken attempt 1/1 failed: stub failure",
+    "agent \"broken\" exhausted 1 attempt: AGENT_EXECUTION_ERROR stub failure",
+    "scanning demo",
+    "Logs persisted to /work/store/projects/project-60f890a3a987/runs/mwof4hgc-8kfg7f.log"
+  ],
+  "result": {
+    "a": {
+      "files": 3,
+      "note": "stub"
+    },
+    "b": "stub answer #2",
+    "c": "late",
+    "ok": true
+  },
+  "tokenUsage": {
+    "input": 310,
+    "output": 62,
+    "total": 372,
+    "cost": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "startedAt": "2026-11-20T03:27:16.575Z",
+  "updatedAt": "2026-11-20T03:27:24.943Z",
+  "completedAt": "2026-11-20T03:27:24.943Z",
+  "durationMs": 8
+}

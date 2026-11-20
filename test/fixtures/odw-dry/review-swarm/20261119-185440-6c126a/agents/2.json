@@ -1,0 +1,14 @@
+{
+  "agentId": 2,
+  "key": "6714f3de92d41a32da04631df7ebc62d51827df63f7644e8c62640a8c74834e7",
+  "label": "review:correctness",
+  "phase": "Review",
+  "adapter": "mock",
+  "attempts": 1,
+  "startedAt": 1795136081.612,
+  "finishedAt": 1795136081.62,
+  "value": {
+    "findings": []
+  },
+  "permissions": "edit"
+}

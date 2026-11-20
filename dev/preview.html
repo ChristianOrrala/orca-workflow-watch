@@ -1,0 +1,65 @@
+<!doctype html>
+<html class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workflows preview</title>
+    <style>
+      /* Stand-ins for the --orca-* variables Orca injects, close to its default dark and light themes. */
+      html.dark {
+        --orca-background: #0e0e10; --orca-foreground: #ececef; --orca-card: #161619; --orca-card-foreground: #ececef;
+        --orca-muted: #1e1e22; --orca-muted-foreground: #8e8e98; --orca-border: #28282e; --orca-input: #34343b;
+        --orca-ring: #8b97ff; --orca-radius: 8px; --orca-destructive: #ff6b6b;
+      }
+      html.light {
+        --orca-background: #ffffff; --orca-foreground: #18181b; --orca-card: #fafafa; --orca-card-foreground: #18181b;
+        --orca-muted: #f1f1f3; --orca-muted-foreground: #6b6b76; --orca-border: #e4e4e8; --orca-input: #d6d6dc;
+        --orca-ring: #4b5ce4; --orca-radius: 8px; --orca-destructive: #d63c3c;
+      }
+      html { background: var(--orca-background); }
+      body { max-width: var(--w, 340px); margin: 0; border-right: 1px solid var(--orca-border); }
+    </style>
+    <link rel="stylesheet" href="/panel/style.css" />
+    <script>
+      const params = new URLSearchParams(location.search)
+      document.documentElement.className = params.get('theme') === 'light' ? 'light' : 'dark'
+      if (params.get('w')) document.documentElement.style.setProperty('--w', `${params.get('w')}px`)
+      const listeners = new Map()
+      const source = new EventSource('/events')
+      source.onmessage = (m) => {
+        const { event, payload } = JSON.parse(m.data)
+        for (const fn of listeners.get(event) ?? []) fn(payload)
+      }
+      window.orca = {
+        api: { major: 1, minor: 10 },
+        on: () => ({ dispose() {} }),
+        plugin: {
+          async request(name, input) {
+            const res = await fetch('/request', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, input }) })
+            const body = await res.json()
+            if (body.error) throw Object.assign(new Error(body.error.message), { code: body.error.code })
+            return body.output
+          },
+          on(event, fn) {
+            if (!listeners.has(event)) listeners.set(event, [])
+            listeners.get(event).push(fn)
+            return { dispose() {} }
+          },
+        },
+      }
+    </script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="beacon" id="beacon" aria-hidden="true"></span>
+        <h1>Workflows</h1>
+      </div>
+      <div class="tally" id="tally" aria-live="polite"></div>
+    </header>
+    <main id="list"></main>
+    <div class="hosts" id="hosts" hidden></div>
+    <footer class="foot" id="foot"></footer>
+    <script src="/panel/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "runId": "20261119-195000-aaaaaa",
+  "state": "done",
+  "dispatched": 0,
+  "updatedAt": 1795139715.182,
+  "pid": 21472,
+  "pidStart": "ps:Fri Nov 20 01:55:15 2026",
+  "name": "plan-flow",
+  "description": "Execute an approved implementation plan task by task: implement, gate, two reviewers, then an integration review; in a second stage, full gates and a checkpointed local merge.",
+  "phases": [
+    {
+      "title": "Preflight"
+    },
+    {
+      "title": "Tasks"
+    },
+    {
+      "title": "Deferred fixes"
+    },
+    {
+      "title": "Integration review"
+    },
+    {
+      "title": "Merge"
+    }
+  ],
+  "spentTokens": 0
+}

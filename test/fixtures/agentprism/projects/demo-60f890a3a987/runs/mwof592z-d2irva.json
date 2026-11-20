@@ -1,0 +1,39 @@
+{
+  "runId": "mwof592z-d2irva",
+  "workflowName": "crash-demo",
+  "script": "export const meta = { name: \"crash-demo\", description: \"Owner dies mid-call\" };\nawait agent(\"long\", { label: \"long\" }); return 1;",
+  "scriptOrigin": {
+    "kind": "inline"
+  },
+  "args": {},
+  "effectiveCwd": "/work/demo",
+  "runtime": {
+    "engineVersion": "4.0.5",
+    "node": "v26.8.1",
+    "v8": "14.6.202.34-node.28",
+    "pathFormat": 1,
+    "inputsFormat": 2,
+    "checkpointInputsFormat": 2
+  },
+  "resume": {
+    "format": "identity-v1"
+  },
+  "eventStreamId": "372aa2713d77694f8098b04772ccf162",
+  "eventSeq": 0,
+  "journal": [],
+  "calls": [],
+  "callsAllocated": 0,
+  "limits": {
+    "maxAgents": 1000,
+    "concurrency": 8,
+    "agentRetries": 0
+  },
+  "status": "paused",
+  "phases": [],
+  "agents": [],
+  "logs": [],
+  "startedAt": "2026-11-20T03:27:52.382Z",
+  "updatedAt": "2026-11-20T03:27:59.473Z",
+  "pauseReason": "interrupted",
+  "reason": "Interrupted: owning process PID 27472 exited before completion; recovered to a resumable pause."
+}

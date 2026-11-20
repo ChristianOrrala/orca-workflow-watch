@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs dev/fake-orca.mjs with the loader that lets plain Node read the plugin's TypeScript.
+here=$(cd "$(dirname "$0")" && pwd)
+exec node --no-warnings --import "$here/register.mjs" "$here/fake-orca.mjs" "$@"

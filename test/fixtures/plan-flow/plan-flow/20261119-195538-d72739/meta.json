@@ -1,0 +1,18 @@
+{
+  "runId": "20261119-195538-d72739",
+  "configPath": null,
+  "source": "/work/repo",
+  "budgetTotal": null,
+  "workflowName": "plan-flow",
+  "adapter": null,
+  "permissions": null,
+  "origin": null,
+  "dry": true,
+  "launchedBy": "someone@example.com",
+  "resumedFrom": null,
+  "resumedFromDir": null,
+  "inline": false,
+  "odwVersion": "0.5.0-dev+gbaf2c8ed5d49",
+  "sourceHash": "7e2b5b7954a1406090ef18816c04da04172ee864c7ce49a77a30f794c4643a02",
+  "createdAt": 1795139738.276
+}

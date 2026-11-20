@@ -1,0 +1,12 @@
+{
+  "value": {
+    "status": "error",
+    "reason": "/work/rundir/env-status.json is missing or its status is not \"success\". Prepare it first (plan-step, prepare.md).",
+    "trace": "",
+    "model_trace": "",
+    "adapter_trace": "",
+    "merge_attempted": false,
+    "ledger": "",
+    "plan_status": ""
+  }
+}
