@@ -22,8 +22,15 @@ import { expandHome } from './sources/paths'
 
 const DEFAULT_ROOT = '~/.odw/runs'
 const DEFAULT_AGENTPRISM_ROOT = '~/.agentprism/workflows'
-/** This plugin's key on a paired server. */
-const PLUGIN_KEY = 'local.orca-workflow-watch'
+/** The manifest's id. */
+const PLUGIN_ID = 'workflow-watch-orca'
+/**
+ * The key a paired server's copy answers to. It is not this copy's own key: the worker API does
+ * not expose that, and it would not help, because `orca plugin dev request` reaches only
+ * development plugins, so every server loads this plugin from a folder and Orca names a folder's
+ * copy `local.<id>`, whatever catalog this computer installed it from.
+ */
+const PLUGIN_KEY = `local.${PLUGIN_ID}`
 const STATUS_ITEM = 'workflows'
 const FAST_MS = 1000
 const SLOW_MS = 5000

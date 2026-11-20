@@ -1,6 +1,6 @@
-# Orca Workflow Watch
+# Workflow Watch for Orca
 
-An Orca plugin that shows workflow runs live in the right sidebar, from two engines side by side: [Open Dynamic Workflows](https://github.com/xz1220/open-dynamic-workflows) (ODW) and [AgentPrism Workflows](https://github.com/agentprism/agentprism-workflows).
+A community plugin for [Orca](https://github.com/stablyai/orca) that shows workflow runs live in the right sidebar, from two engines side by side: [Open Dynamic Workflows](https://github.com/xz1220/open-dynamic-workflows) (ODW) and [AgentPrism Workflows](https://github.com/agentprism/agentprism-workflows).
 
 - **A card per live run:** a ticking clock, a phase rail (finished phases green, the current one striped), and every agent as a bead that pulses while it works. Earlier phases shrink to one line of dots, a failed agent is a red diamond, and a run that finishes gets a short shimmer (a red wash if it failed) before it settles into the history. Loops pause while Orca's window is hidden.
 - **Phase times:** each phase in the open card shows how long it took (`1:36:42`, or `4:05` under an hour); the current one ticks. A phase of commands only takes its span from its commands, so ODW's Preflight, marked after its commands ran, shows their real time. History rows show each phase's time on hover over the metro line.
@@ -33,17 +33,26 @@ Adding an engine is one more `RunSource` in the worker's list.
 
 ## Install
 
-Needs Orca 1.4.248 or newer.
+Needs Orca 1.4.248 or newer. Orca installs it as `<publisher>.workflow-watch-orca`; the publisher comes from where you install it, so `orca plugin list` shows the key to use with `orca plugin update`.
 
-**On one computer** (it watches the runs on that computer):
+**From Orca's community catalog:** open [its directory page](https://orca.dev/plugins/christianorrala.workflow-watch-orca?catalog=community) and press Install in Orca, or from a terminal:
 
 ```sh
-orca plugin install ChristianOrrala/orca-workflow-watch
-# Orca answers approval_required with the exact command to run again with --approve <fingerprint>.
-orca plugin update <key>   # later, to update: the key is the one `orca plugin list` shows
+orca plugin install christianorrala.workflow-watch-orca --catalog community
 ```
 
-**With paired Orca servers:** the plugin must also run on each server, loaded as a development plugin, because Orca's requests to a paired server only reach development plugins. On each server (or from your computer, with `--environment <server>` and the server's absolute path):
+**From the ChristianOrrala/agents catalog:**
+
+```sh
+orca plugin catalog add ChristianOrrala/agents          # answers approval_required: re-run with --approve <fingerprint>
+orca plugin install christianorrala.workflow-watch-orca
+# Orca answers approval_required with the exact command to run again with --approve <fingerprint>.
+orca plugin update christianorrala.workflow-watch-orca   # later
+```
+
+Both install as `christianorrala.workflow-watch-orca`, and an install updates only from the catalog it came from (with both catalogs added, pick one with `--catalog`). `orca plugin install ChristianOrrala/orca-workflow-watch` also works, straight from the repository's newest version tag, unverified. Each install watches the runs on the computer it is on.
+
+**With paired Orca servers:** the plugin must also run on each server, loaded there as a development folder (key `local.workflow-watch-orca`), because the worker asks a paired server through `orca plugin dev request`, which reaches only development plugins (Orca refuses it for installed ones). On each server (or from your computer, with `--environment <server>` and the server's absolute path):
 
 ```sh
 git clone https://github.com/ChristianOrrala/orca-workflow-watch.git
@@ -52,7 +61,7 @@ orca plugin dev load ./orca-workflow-watch --approve <fingerprint> --json
 # later: git pull, then orca plugin dev reload ./orca-workflow-watch
 ```
 
-The panel then lists each paired server in its header; one without the plugin reads "not set up". Every computer runs the same version: update them together.
+The panel then lists each paired server in its header; one without the plugin reads "not set up". Your own computer can use either a catalog install or a development folder. Every computer runs the same version: update them together.
 
 ## Access it asks for
 
@@ -63,6 +72,10 @@ The panel then lists each paired server in its header; one without the plugin re
 - **`ps`**, on macOS, to check that a run's recorded process is still the same one (ODW's own check).
 
 It reads run files as regular files only (never through a symlink), with size limits, and the commands it offers to copy are built only from run ids the engine itself would issue.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Workflow Watch for Orca is an independent project: it is not made, maintained or endorsed by Orca or Stably, nor by the ODW or AgentPrism projects whose runs it reads.
 
 ## Develop
 

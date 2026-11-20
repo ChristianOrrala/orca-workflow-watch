@@ -1,10 +1,22 @@
 {
   "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
   "manifestVersion": 2,
-  "id": "orca-workflow-watch",
-  "name": "Orca Workflow Watch",
+  "id": "workflow-watch-orca",
+  "name": "Workflow Watch for Orca",
   "version": "0.2.1",
-  "description": "Watch Open Dynamic Workflows and AgentPrism Workflows runs live in Orca's sidebar, on this computer and on every paired Orca server: phases, every agent as it works, the run's log, tokens, and a nudge when a run finishes or waits for you.",
+  "description": "Shows Open Dynamic Workflows and AgentPrism Workflows runs live in the right sidebar, on this computer and on every paired server: phases, every agent as it works, the run's log, tokens, and a notification when a run finishes or waits for you. Read-only. A community plugin, not made or endorsed by Orca or Stably.",
+  "author": {
+    "name": "Christian Orrala",
+    "url": "https://github.com/ChristianOrrala"
+  },
+  "repository": "https://github.com/ChristianOrrala/orca-workflow-watch",
+  "homepage": "https://github.com/ChristianOrrala/orca-workflow-watch#readme",
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "cover": {
+    "path": "assets/cover.png",
+    "alt": "The Workflows panel with a review-swarm run waiting at a checkpoint: phase timeline, approve command and run log"
+  },
   "engines": {
     "orca": ">=1.4.248"
   },
@@ -24,7 +36,7 @@
     "commands": [
       {
         "id": "workflowWatch.toggleSidebar",
-        "title": "Orca Workflow Watch: Show or hide the sidebar",
+        "title": "Workflow Watch for Orca: Show or hide the sidebar",
         "action": "sidebar.right.toggle"
       }
     ],
@@ -34,7 +46,7 @@
         "text": "Workflows",
         "icon": "activity",
         "tone": "neutral",
-        "tooltip": "Orca Workflow Watch",
+        "tooltip": "Workflow Watch for Orca",
         "command": "workflowWatch.toggleSidebar"
       }
     ],

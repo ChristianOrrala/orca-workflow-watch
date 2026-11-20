@@ -143,7 +143,7 @@ test('the full log of a run on a paired server is asked of that server', async (
       if (args[4] === 'watch.log') return ok({ result: { runId: 'r1', lines: [{ ts: 1, text: 'a', tone: 'warn' }], dropped: 0 } })
       return ok({ result: { runs: [] } })
     },
-    pluginKey: 'local.orca-workflow-watch',
+    pluginKey: 'local.workflow-watch-orca',
     wanted: () => 'auto',
     onChange: () => undefined,
   })

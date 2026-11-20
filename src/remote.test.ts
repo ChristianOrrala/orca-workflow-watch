@@ -15,7 +15,7 @@ function hostsWith(answers: (args: string[]) => CliResult, wanted = 'auto') {
       calls.push(args)
       return answers(args)
     },
-    pluginKey: 'local.orca-workflow-watch',
+    pluginKey: 'local.workflow-watch-orca',
     wanted: () => wanted,
     onChange: () => changes++,
   })
@@ -26,14 +26,14 @@ test('every saved server is asked for its own runs only, by id, over --environme
   const { remote, calls, changes } = hostsWith((args) => {
     if (args[0] === 'environment') return ok({ environments: [{ id: 'env-mini', name: 'Mac mini' }, { id: 'env-pc', name: 'Studio PC' }] })
     const env = args[args.indexOf('--environment') + 1]
-    if (env === 'env-mini') return ok({ pluginKey: 'local.orca-workflow-watch', name: 'watch.snapshot', result: { runs: [run('r1')], hosts: [] } })
+    if (env === 'env-mini') return ok({ pluginKey: 'local.workflow-watch-orca', name: 'watch.snapshot', result: { runs: [run('r1')], hosts: [] } })
     return fail('runtime_unreachable', 'could not connect to Studio PC')
   })
   await remote.tick(1_000_000)
   const asked = calls.filter((c) => c[0] === 'plugin')
   assert.equal(asked.length, 2)
   for (const args of asked) {
-    assert.deepEqual(args.slice(0, 5), ['plugin', 'dev', 'request', 'local.orca-workflow-watch', 'watch.snapshot'])
+    assert.deepEqual(args.slice(0, 5), ['plugin', 'dev', 'request', 'local.workflow-watch-orca', 'watch.snapshot'])
     assert.equal(args[args.indexOf('--data') + 1], '{"localOnly":true}', 'a server never relays its own paired servers back')
   }
   const states = Object.fromEntries(remote.hosts().map((h) => [h.name, h.state]))
@@ -86,6 +86,6 @@ test('a server without the plugin is asked once, under the one key, and reads as
   )
   await remote.tick(1_000_000)
   assert.equal(remote.hosts()[0].state, 'no-plugin')
-  assert.match(remote.hosts()[0].error ?? '', /local\.orca-workflow-watch/)
-  assert.deepEqual(calls.filter((c) => c[0] === 'plugin').map((c) => c[3]), ['local.orca-workflow-watch'])
+  assert.match(remote.hosts()[0].error ?? '', /local\.workflow-watch-orca/)
+  assert.deepEqual(calls.filter((c) => c[0] === 'plugin').map((c) => c[3]), ['local.workflow-watch-orca'])
 })

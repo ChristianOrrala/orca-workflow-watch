@@ -1,4 +1,4 @@
-// Orca Workflow Watch — the Workflows panel. It draws what the worker sends (see src/protocol.ts) and
+// Workflow Watch for Orca — the Workflows panel. It draws what the worker sends (see src/protocol.ts) and
 // updates the page in place, keyed by run, phase and agent, so animations run on instead of
 // restarting at every update. Text only ever goes in through textContent.
 ;(() => {
@@ -1214,7 +1214,7 @@
     ok: 'connected',
     connecting: 'connecting…',
     offline: 'unreachable',
-    'no-plugin': 'Orca Workflow Watch not loaded there',
+    'no-plugin': 'Workflow Watch for Orca not loaded there',
     error: 'error',
   }
   function renderHosts() {
@@ -1239,7 +1239,7 @@
         const count = snap.runs.filter((r) => (r.host || 'local') === item.id).length
         chip.title = item.local
           ? `${item.name} (this computer) · ${count} run${count === 1 ? '' : 's'}`
-          : `${item.name} · ${HOST_WORDS[item.state] || item.state}${item.state === 'ok' ? ` · ${count} run${count === 1 ? '' : 's'}` : ''}${item.error ? `\n${item.error}` : ''}${item.state === 'no-plugin' ? '\nLoad Orca Workflow Watch there as a development plugin (orca plugin dev load <folder>) to see its runs here.' : ''}`
+          : `${item.name} · ${HOST_WORDS[item.state] || item.state}${item.state === 'ok' ? ` · ${count} run${count === 1 ? '' : 's'}` : ''}${item.error ? `\n${item.error}` : ''}${item.state === 'no-plugin' ? '\nLoad Workflow Watch for Orca there as a development plugin (orca plugin dev load <folder>) to see its runs here.' : ''}`
       },
     )
   }
@@ -1427,7 +1427,7 @@
     if (paused) chips.push(['', paused, ' paused', 'Nothing moves in a paused run until it is resumed.'])
     if (today && !running && !waiting && !paused) chips.push(['', today, ' today', ''])
     if (unreachable.length) chips.push(['c-quiet', unreachable.length, ' unreachable', unreachable.map((x) => x.name).join(', ')])
-    if (unset.length) chips.push(['c-quiet', unset.length, ' not set up', `Orca Workflow Watch is not loaded as a development plugin on ${unset.map((x) => x.name).join(', ')}`])
+    if (unset.length) chips.push(['c-quiet', unset.length, ' not set up', `Workflow Watch for Orca is not loaded as a development plugin on ${unset.map((x) => x.name).join(', ')}`])
     if (ui.stale) chips.push(['c-warn c-quiet', null, 'no updates', 'The watcher has not posted for over 30 seconds, so these runs may have moved on.'])
     const tally = document.getElementById('tally')
     const tallySig = JSON.stringify(chips)

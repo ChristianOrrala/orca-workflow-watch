@@ -11,7 +11,7 @@ import { normalizeRun } from './wire'
 import type { RunView } from './protocol'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const temp = (name: string) => mkdtempSync(join(tmpdir(), `orca-workflow-watch-${name}-`))
+const temp = (name: string) => mkdtempSync(join(tmpdir(), `workflow-watch-orca-${name}-`))
 const waitingView = (id: string, checkpointId: number | null) =>
   ({ id, waiting: { title: 'Ship it?', since: 0, checkpointId } }) as unknown as RunView
 

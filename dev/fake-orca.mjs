@@ -21,7 +21,7 @@ if (args[0] === 'environment' && args[1] === 'list') {
     process.exit(1)
   }
   // The plugin key the fake server's copy answers to: none plays a server without the plugin.
-  const key = process.env.FAKE_ORCA_KEY ?? 'local.orca-workflow-watch'
+  const key = process.env.FAKE_ORCA_KEY ?? 'local.workflow-watch-orca'
   if (args[3] !== key) {
     out({ ok: false, error: { code: 'plugin_not_found', message: `${args[3]} is not loaded on ${name}` } })
     process.exit(1)
