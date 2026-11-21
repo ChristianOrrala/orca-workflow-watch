@@ -450,32 +450,61 @@ button.bar:hover { background: color-mix(in srgb, var(--b) 100%, var(--fg) 25%);
 .row .rt .ago { color: var(--muted); font-size: var(--t-micro); white-space: nowrap; margin-left: auto; font-variant-numeric: tabular-nums; }
 .row .rs { color: var(--muted); font-size: var(--t-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A row's run as one metro line: stations for phases, tracks for a few agents, a strip for many. */
-.metro { display: flex; align-items: center; height: 10px; margin-top: 4px; }
-.metro .st { width: 7px; height: 7px; flex: none; border-radius: 50%; border: 1.5px solid var(--idle); background: var(--bg); position: relative; z-index: 1; }
+/* The line is a real track: 4 px rail, 11 px stations, agent blocks 16 px tall. Colours match
+   the open card's bars (ok 72%, failed striped red, cut hatched grey). */
+.metro {
+  --rail: 4px; --tall: 16px;
+  --ok-m: color-mix(in srgb, var(--ok) 72%, transparent);
+  display: flex; align-items: center; height: var(--tall); margin-top: 6px;
+}
+.metro .st {
+  width: 11px; height: 11px; flex: none; border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, var(--fg) 26%, transparent); background: var(--bg); position: relative; z-index: 1;
+}
 .row:hover .metro .st, .row.open .metro .st { background: color-mix(in srgb, var(--soft) 100%, var(--bg)); }
-.metro .st.on { border-color: color-mix(in srgb, var(--fg) 62%, transparent); }
-.metro .st.halt { border-color: var(--bad); }
-.metro .ms { --m: var(--idle); flex: 1 1 0; min-width: 8px; height: 100%; position: relative; margin: 0 -1px; }
-.metro .ms::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: var(--m); }
-.metro .ms.m-done { --m: color-mix(in srgb, var(--ok) 70%, transparent); }
+.metro .st.on { border-color: var(--ok); }
+.row.s-stopped .metro .st.on, .row.s-asked .metro .st.on { border-color: color-mix(in srgb, var(--fg) 62%, transparent); }
+/* The terminus of a run that went all the way: a filled stop. */
+.metro .st.end, .row:hover .metro .st.end, .row.open .metro .st.end { background: var(--ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 18%, transparent); }
+/* Where a run broke down: a red stop with a cross-bar, readable without colour. */
+.metro .st.halt { border-color: var(--bad); background: var(--bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bad) 20%, transparent); }
+.metro .st.halt::after { content: ''; position: absolute; left: 50%; top: 50%; width: 2px; height: 2px; margin: -1px 0 0 -1px; border-radius: 50%; background: var(--bad); }
+.metro .ms { --m: var(--idle); flex: 1 1 0; min-width: 10px; height: 100%; position: relative; margin: 0 -1px; }
+.metro .ms::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: var(--rail); margin-top: calc(var(--rail) / -2); border-radius: 2px; background: var(--m); }
+.metro .ms.m-done { --m: var(--ok-m); }
 .metro .ms.m-active { --m: var(--run); }
 .metro .ms.m-failed { --m: var(--bad); }
-.metro .ms.m-pending::before, .metro .ms.m-skipped::before { background: repeating-linear-gradient(90deg, var(--idle) 0 2px, transparent 2px 5px); }
-/* A split phase leaves the line, runs as tracks or a strip, and joins it again. */
-.metro .ms.split::before { background: linear-gradient(90deg, var(--m) 0 16%, transparent 16% 84%, var(--m) 84%); }
-.metro .tks { position: absolute; inset: 0 12%; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-.metro .tks i { height: 1.5px; border-radius: 1px; background: var(--a); }
-.metro .tcs { position: absolute; inset: 2px 12%; display: flex; gap: 1px; }
-.metro .tcs.dense { gap: 0; }
-.metro .tcs i { flex: 1 1 0; min-width: 0.5px; border-radius: 0.5px; background: var(--a); }
-.metro .a-done { --a: color-mix(in srgb, var(--ok) 75%, transparent); }
+/* Not reached: dots along a grey track, clearly a road not taken. */
+.metro .ms.m-pending::before, .metro .ms.m-skipped::before {
+  height: 4px; margin-top: -2px; border-radius: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--fg) 30%, transparent) 1.5px, transparent 2px) 0 50% / 7px 4px repeat-x;
+}
+/* A split phase leaves the line, runs as tracks or a block, and joins it again. */
+.metro .ms.split::before { background: linear-gradient(90deg, var(--m) 0 14%, transparent 14% 86%, var(--m) 86%); }
+.metro .ms:hover::before { filter: brightness(1.25); }
+.metro .tks { position: absolute; inset: 0 10%; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.metro .tks i { height: 3px; border-radius: 2px; background: var(--a); }
+.metro .tks i:first-child:nth-last-child(2), .metro .tks i:first-child:nth-last-child(2) ~ i { height: 4px; }
+.metro .tcs { position: absolute; inset: 1px 10%; display: flex; gap: 1.5px; }
+.metro .tcs i { flex: 1 1 0; min-width: 1px; border-radius: 1.5px; background: var(--a); }
+/* Many agents band into rows, so a phase of 48 reads as a busy block, not a smudge. */
+.metro .tcs.banded {
+  display: grid; gap: 1.5px 1px;
+  grid-template-rows: repeat(var(--rows), 1fr); grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-auto-flow: column;
+}
+.metro .tcs.banded i { border-radius: 1px; }
+.metro .ms:hover .tcs i, .metro .ms:hover .tks i { filter: brightness(1.2); }
+.metro .a-done { --a: var(--ok-m); }
 .metro .a-running { --a: var(--run); }
-.metro .a-failed { --a: var(--bad); }
-.metro .a-cut { --a: color-mix(in srgb, var(--fg) 30%, transparent); }
-.barcode { display: flex; align-items: flex-end; gap: 1.5px; height: 18px; flex: none; max-width: 62px; }
-.barcode i { flex: 0 1 2.5px; min-width: 1px; border-radius: 1px; background: color-mix(in srgb, var(--ok) 70%, transparent); min-height: 3px; }
+.metro .a-failed { --a: var(--bad); background: repeating-linear-gradient(135deg, var(--bad) 0 2px, color-mix(in srgb, var(--bad) 55%, transparent) 2px 4px); }
+.metro .a-cut { --a: transparent; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--fg) 40%, transparent) 0 1.5px, transparent 1.5px 3px); }
+/* A fold's mini line: one pill per run, as tall as its slowest, in the metro's green. */
+.barcode { display: flex; align-items: flex-end; gap: 2px; height: 26px; flex: none; max-width: 72px; padding-bottom: 2px; }
+.barcode i { flex: 0 1 5px; min-width: 2px; border-radius: 2.5px; background: color-mix(in srgb, var(--ok) 72%, transparent); min-height: 5px; }
+.barcode i:last-child { background: var(--ok); }
 @container (max-width: 300px) {
-  .barcode { max-width: 32px; gap: 1px; }
+  .barcode { max-width: 40px; gap: 1.5px; }
 }
 .barcode i.f { background: var(--bad); }
 

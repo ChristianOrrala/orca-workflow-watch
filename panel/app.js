@@ -615,20 +615,27 @@
       const took = timeOf(p)
       seg.title = `${p.title || 'Agents'}${p.state === 'skipped' ? ' · skipped' : took ? ` · ${took}` : ''}`
       const n = p.agents.length
+      // A busy phase takes more of the line, so 48 agents read as a long busy stretch.
+      if (n > 4) seg.style.flexGrow = String(1 + Math.min(3, (n - 4) / 10))
       if (n >= 2 && n <= 4) {
         seg.classList.add('split')
         const tracks = h('span', 'tks')
         for (const a of p.agents) tracks.append(h('i', agentCls(a)))
         seg.append(tracks)
       } else if (n > 4) {
+        // Many agents: a block of cells, one per agent, in up to three bands.
         seg.classList.add('split')
-        const strip = h('span', n > 16 ? 'tcs dense' : 'tcs')
+        const rows = n > 32 ? 3 : n > 12 ? 2 : 1
+        const strip = h('span', rows > 1 ? 'tcs banded' : 'tcs')
+        strip.style.setProperty('--cols', String(Math.ceil(n / rows)))
+        strip.style.setProperty('--rows', String(rows))
         for (const a of p.agents) strip.append(h('i', agentCls(a)))
         seg.append(strip)
       }
       kids.push(seg)
     })
-    kids.push(h('i', lastRan === shown.length - 1 && !halted ? 'st on' : 'st'))
+    // A run that got to the end arrives at a filled terminus.
+    kids.push(h('i', lastRan === shown.length - 1 && !halted ? 'st on end' : 'st'))
     // Where a stopped or failed run ended: the station after the last phase that ran.
     if (halted && lastRan >= 0) kids[(lastRan + 1) * 2].className = 'st halt'
     el.replaceChildren(...kids)
@@ -1097,7 +1104,7 @@
     el.replaceChildren(
       ...slices.map((slice) => {
         const bar = h('i', slice.some((x) => x.failed) ? 'f' : '')
-        bar.style.height = `${Math.max(3, Math.round(4 + (Math.max(...slice.map((x) => x.took)) / longest) * 14))}px`
+        bar.style.height = `${Math.max(5, Math.round(6 + (Math.max(...slice.map((x) => x.took)) / longest) * 18))}px`
         return bar
       }),
     )
