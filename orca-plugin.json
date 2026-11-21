@@ -108,6 +108,14 @@
         "maximum": 50
       },
       {
+        "key": "metroSize",
+        "title": "Metro line size",
+        "description": "How tall each finished run's line of stations and tracks draws in the history. compact fits more rows; large is easiest to read.",
+        "type": "string",
+        "enum": ["compact", "comfortable", "large"],
+        "default": "comfortable"
+      },
+      {
         "key": "passHighlightMinutes",
         "title": "Passed runs stay green for (minutes)",
         "description": "How long the status bar shows a pass in green after its run ended. 0 never shows it green.",

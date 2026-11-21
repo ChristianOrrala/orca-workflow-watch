@@ -425,7 +425,7 @@ button.bar:hover { background: color-mix(in srgb, var(--b) 100%, var(--fg) 25%);
 .row {
   --c: var(--ok);
   display: flex; align-items: center; gap: var(--space-item); width: 100%; text-align: left;
-  padding: 6px var(--space-item); border-radius: var(--radius); border: 1px solid transparent;
+  padding: var(--m-row-pad) var(--space-item); border-radius: var(--radius); border: 1px solid transparent;
   /* Opaque, so a row sliding during a morph covers what it passes instead of printing over it. */
   background: var(--bg); cursor: pointer;
 }
@@ -449,62 +449,124 @@ button.bar:hover { background: color-mix(in srgb, var(--b) 100%, var(--fg) 25%);
 .row .rt b { font-size: var(--t-body); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .rt .ago { color: var(--muted); font-size: var(--t-micro); white-space: nowrap; margin-left: auto; font-variant-numeric: tabular-nums; }
 .row .rs { color: var(--muted); font-size: var(--t-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* A row's run as one metro line: stations for phases, tracks for a few agents, a strip for many. */
-/* The line is a real track: 4 px rail, 11 px stations, agent blocks 16 px tall. Colours match
-   the open card's bars (ok 72%, failed striped red, cut hatched grey). */
+/* A row's run as one metro line: stations for phases, tracks for a few agents, a block for many.
+   Colours match the open card's bars (ok 72%, failed striped red, cut hatched grey).
+   Every size comes from the scale below, chosen by the "Metro line size" setting (html[data-metro]);
+   comfortable is the default. */
+:root, html[data-metro="comfortable"] {
+  --m-row-pad: 6px;   /* a history row's top and bottom padding */
+  --m-tall: 16px;     /* the line's height: tracks and agent blocks fill it */
+  --m-top: 6px;       /* space between the summary and the line */
+  --m-rail: 4px;      /* the rail between stations */
+  --m-st: 11px;       /* a station's outer size */
+  --m-st-bw: 2.5px;   /* its ring */
+  --m-halo: 2px;      /* the glow round a terminus or a halt */
+  --m-pin: 2px;       /* the dot inside a halt */
+  --m-seg: 10px;      /* the shortest stretch of rail */
+  --m-track: 3px;     /* an agent's track when 3-4 run side by side */
+  --m-track2: 4px;    /* ...and when only 2 do */
+  --m-track-gap: 2px;
+  --m-cells-inset: 1px; /* a crowd block's top and bottom inset */
+  --m-cell-gap: 1.5px;  /* between agents in a crowd, and between its bands */
+  --m-cell-col: 1px;    /* between columns of a banded crowd */
+  --m-cell-r: 1.5px;
+  --m-band-r: 1px;
+  --m-dot: 1.5px;     /* a not-reached track's dots: radius and spacing */
+  --m-dot-gap: 7px;
+  --m-bar-h: 26px;    /* a fold's mini line */
+  --m-bar-pad: 2px;
+  --m-bar-w: 5px; --m-bar-min-w: 2px; --m-bar-gap: 2px;
+  --m-bar-min: 6px; --m-bar-max: 24px; /* the fastest and slowest run's pill */
+  --m-bar-span: 72px; --m-bar-span-narrow: 40px; --m-bar-gap-narrow: 1.5px;
+}
+/* The pre-0.5 look: a hairline you glance past. */
+html[data-metro="compact"] {
+  --m-row-pad: 6px; --m-tall: 10px; --m-top: 4px;
+  --m-rail: 2px; --m-st: 7px; --m-st-bw: 1.5px; --m-halo: 1.5px; --m-pin: 1.5px; --m-seg: 8px;
+  --m-track: 1.5px; --m-track2: 1.5px; --m-track-gap: 2px;
+  --m-cells-inset: 2px; --m-cell-gap: 1px; --m-cell-col: 0.5px; --m-cell-r: 0.5px; --m-band-r: 0.5px;
+  --m-dot: 1px; --m-dot-gap: 5px;
+  --m-bar-h: 18px; --m-bar-pad: 0px;
+  --m-bar-w: 2.5px; --m-bar-min-w: 1px; --m-bar-gap: 1.5px;
+  --m-bar-min: 4px; --m-bar-max: 18px;
+  --m-bar-span: 62px; --m-bar-span-narrow: 32px; --m-bar-gap-narrow: 1px;
+}
+/* A line you can read across the room: chunky rail, big stops, crowds as real blocks. */
+html[data-metro="large"] {
+  --m-row-pad: 7px; --m-tall: 22px; --m-top: 8px;
+  --m-rail: 5px; --m-st: 14px; --m-st-bw: 3px; --m-halo: 2.5px; --m-pin: 3px; --m-seg: 12px;
+  --m-track: 4px; --m-track2: 5.5px; --m-track-gap: 2px;
+  --m-cells-inset: 1px; --m-cell-gap: 2px; --m-cell-col: 1.5px; --m-cell-r: 2px; --m-band-r: 1.5px;
+  --m-dot: 2px; --m-dot-gap: 9px;
+  --m-bar-h: 32px; --m-bar-pad: 2px;
+  --m-bar-w: 6px; --m-bar-min-w: 2.5px; --m-bar-gap: 2.5px;
+  --m-bar-min: 7px; --m-bar-max: 30px;
+  --m-bar-span: 88px; --m-bar-span-narrow: 50px; --m-bar-gap-narrow: 2px;
+}
 .metro {
-  --rail: 4px; --tall: 16px;
   --ok-m: color-mix(in srgb, var(--ok) 72%, transparent);
-  display: flex; align-items: center; height: var(--tall); margin-top: 6px;
+  display: flex; align-items: center; height: var(--m-tall); margin-top: var(--m-top);
 }
 .metro .st {
-  width: 11px; height: 11px; flex: none; border-radius: 50%;
-  border: 2.5px solid color-mix(in srgb, var(--fg) 26%, transparent); background: var(--bg); position: relative; z-index: 1;
+  width: var(--m-st); height: var(--m-st); flex: none; border-radius: 50%;
+  border: var(--m-st-bw) solid color-mix(in srgb, var(--fg) 26%, transparent); background: var(--bg); position: relative; z-index: 1;
 }
 .row:hover .metro .st, .row.open .metro .st { background: color-mix(in srgb, var(--soft) 100%, var(--bg)); }
 .metro .st.on { border-color: var(--ok); }
 .row.s-stopped .metro .st.on, .row.s-asked .metro .st.on { border-color: color-mix(in srgb, var(--fg) 62%, transparent); }
 /* The terminus of a run that went all the way: a filled stop. */
-.metro .st.end, .row:hover .metro .st.end, .row.open .metro .st.end { background: var(--ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 18%, transparent); }
-/* Where a run broke down: a red stop with a cross-bar, readable without colour. */
-.metro .st.halt { border-color: var(--bad); background: var(--bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bad) 20%, transparent); }
-.metro .st.halt::after { content: ''; position: absolute; left: 50%; top: 50%; width: 2px; height: 2px; margin: -1px 0 0 -1px; border-radius: 50%; background: var(--bad); }
-.metro .ms { --m: var(--idle); flex: 1 1 0; min-width: 10px; height: 100%; position: relative; margin: 0 -1px; }
-.metro .ms::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: var(--rail); margin-top: calc(var(--rail) / -2); border-radius: 2px; background: var(--m); }
+.metro .st.end, .row:hover .metro .st.end, .row.open .metro .st.end { background: var(--ok); box-shadow: 0 0 0 var(--m-halo) color-mix(in srgb, var(--ok) 18%, transparent); }
+/* Where a run broke down: a red stop with a dot in it, readable without colour. */
+.metro .st.halt { border-color: var(--bad); background: var(--bg); box-shadow: 0 0 0 var(--m-halo) color-mix(in srgb, var(--bad) 20%, transparent); }
+.metro .st.halt::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: var(--m-pin); height: var(--m-pin);
+  margin: calc(var(--m-pin) / -2) 0 0 calc(var(--m-pin) / -2); border-radius: 50%; background: var(--bad);
+}
+.metro .ms { --m: var(--idle); flex: 1 1 0; min-width: var(--m-seg); height: 100%; position: relative; margin: 0 -1px; }
+.metro .ms::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: var(--m-rail); margin-top: calc(var(--m-rail) / -2); border-radius: 2px; background: var(--m); }
 .metro .ms.m-done { --m: var(--ok-m); }
 .metro .ms.m-active { --m: var(--run); }
 .metro .ms.m-failed { --m: var(--bad); }
 /* Not reached: dots along a grey track, clearly a road not taken. */
 .metro .ms.m-pending::before, .metro .ms.m-skipped::before {
-  height: 4px; margin-top: -2px; border-radius: 0;
-  background: radial-gradient(circle, color-mix(in srgb, var(--fg) 30%, transparent) 1.5px, transparent 2px) 0 50% / 7px 4px repeat-x;
+  --h: calc(var(--m-dot) * 2 + 1px);
+  height: var(--h); margin-top: calc(var(--h) / -2); border-radius: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--fg) 30%, transparent) var(--m-dot), transparent calc(var(--m-dot) + 0.5px)) 0 50% / var(--m-dot-gap) var(--h) repeat-x;
 }
 /* A split phase leaves the line, runs as tracks or a block, and joins it again. */
 .metro .ms.split::before { background: linear-gradient(90deg, var(--m) 0 14%, transparent 14% 86%, var(--m) 86%); }
 .metro .ms:hover::before { filter: brightness(1.25); }
-.metro .tks { position: absolute; inset: 0 10%; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-.metro .tks i { height: 3px; border-radius: 2px; background: var(--a); }
-.metro .tks i:first-child:nth-last-child(2), .metro .tks i:first-child:nth-last-child(2) ~ i { height: 4px; }
-.metro .tcs { position: absolute; inset: 1px 10%; display: flex; gap: 1.5px; }
-.metro .tcs i { flex: 1 1 0; min-width: 1px; border-radius: 1.5px; background: var(--a); }
+.metro .tks { position: absolute; inset: 0 10%; display: flex; flex-direction: column; justify-content: center; gap: var(--m-track-gap); }
+.metro .tks i { height: var(--m-track); border-radius: 2px; background: var(--a); }
+.metro .tks i:first-child:nth-last-child(2), .metro .tks i:first-child:nth-last-child(2) ~ i { height: var(--m-track2); }
+.metro .tcs { position: absolute; inset: var(--m-cells-inset) 10%; display: flex; gap: var(--m-cell-gap); }
+.metro .tcs i { flex: 1 1 0; min-width: 1px; border-radius: var(--m-cell-r); background: var(--a); }
 /* Many agents band into rows, so a phase of 48 reads as a busy block, not a smudge. */
 .metro .tcs.banded {
-  display: grid; gap: 1.5px 1px;
+  display: grid; gap: var(--m-cell-gap) var(--m-cell-col);
   grid-template-rows: repeat(var(--rows), 1fr); grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
   grid-auto-flow: column;
 }
-.metro .tcs.banded i { border-radius: 1px; }
+.metro .tcs.banded i { border-radius: var(--m-band-r); }
 .metro .ms:hover .tcs i, .metro .ms:hover .tks i { filter: brightness(1.2); }
 .metro .a-done { --a: var(--ok-m); }
 .metro .a-running { --a: var(--run); }
 .metro .a-failed { --a: var(--bad); background: repeating-linear-gradient(135deg, var(--bad) 0 2px, color-mix(in srgb, var(--bad) 55%, transparent) 2px 4px); }
 .metro .a-cut { --a: transparent; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--fg) 40%, transparent) 0 1.5px, transparent 1.5px 3px); }
-/* A fold's mini line: one pill per run, as tall as its slowest, in the metro's green. */
-.barcode { display: flex; align-items: flex-end; gap: 2px; height: 26px; flex: none; max-width: 72px; padding-bottom: 2px; }
-.barcode i { flex: 0 1 5px; min-width: 2px; border-radius: 2.5px; background: color-mix(in srgb, var(--ok) 72%, transparent); min-height: 5px; }
+/* A fold's mini line: one pill per run, as tall as its slowest (--f, its share of the slowest
+   run, comes from the panel), in the metro's green. */
+.barcode {
+  display: flex; align-items: flex-end; gap: var(--m-bar-gap); height: var(--m-bar-h); flex: none;
+  max-width: var(--m-bar-span); padding-bottom: var(--m-bar-pad);
+}
+.barcode i {
+  flex: 0 1 var(--m-bar-w); min-width: var(--m-bar-min-w); border-radius: calc(var(--m-bar-w) / 2);
+  height: calc(var(--m-bar-min) + var(--f, 0) * (var(--m-bar-max) - var(--m-bar-min)));
+  background: color-mix(in srgb, var(--ok) 72%, transparent);
+}
 .barcode i:last-child { background: var(--ok); }
 @container (max-width: 300px) {
-  .barcode { max-width: 40px; gap: 1.5px; }
+  .barcode { max-width: var(--m-bar-span-narrow); gap: var(--m-bar-gap-narrow); }
 }
 .barcode i.f { background: var(--bad); }
 

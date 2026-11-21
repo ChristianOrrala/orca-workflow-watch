@@ -4,6 +4,7 @@
 //
 //   node --import ./dev/register.mjs dev/preview.mjs --root /tmp/odw-demo [--port 4517]
 //        [--agentprism ~/.agentprism/workflows]                       AgentPrism runs too
+//        [--metro compact|comfortable|large]                          the metro line size
 //        [--remote /tmp/odw-server-runs [--remote-name "Mac mini"] [--remote-key none]]
 //                                                                     a fake paired server
 //   then open http://127.0.0.1:4517/  (?theme=light for the light theme)
@@ -24,7 +25,7 @@ const opt = (name, fallback) => {
   return i >= 0 ? argv[i + 1] : fallback
 }
 const port = Number(opt('port', '4517'))
-const settings = { runsRoot: opt('root', '~/.odw/runs'), agentprismRoot: opt('agentprism', '~/.agentprism/workflows'), notifications: true, history: 12, remotes: 'auto', orcaCli: '' }
+const settings = { runsRoot: opt('root', '~/.odw/runs'), agentprismRoot: opt('agentprism', '~/.agentprism/workflows'), notifications: true, history: 12, metroSize: opt('metro', 'comfortable'), remotes: 'auto', orcaCli: '' }
 // --remote <runs folder>: pretend a paired server holds those runs (dev/fake-orca answers for it).
 if (opt('remote', null)) {
   process.env.FAKE_ORCA_ROOT = opt('remote', null)
@@ -112,6 +113,11 @@ createServer(async (req, res) => {
       return res.writeHead(400).end('not JSON')
     }
     const { name, input } = parsed ?? {}
+    // A stand-in for Orca's Settings page: { name: 'dev.setting', input: { key, value } }.
+    if (name === 'dev.setting' && input && typeof input.key === 'string' && input.key in settings) {
+      await fakeOrca.settings.set(input.key, input.value)
+      return res.end(JSON.stringify({ output: { ok: true } }))
+    }
     const handler = handlers.get(name)
     res.setHeader('content-type', 'application/json')
     if (!handler) return res.end(JSON.stringify({ error: { code: 'unknown_method', message: name } }))

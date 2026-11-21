@@ -98,6 +98,7 @@ A plugin worker runs on the computer whose Orca loaded it, and the plugin API do
 | AgentPrism runs folder | `~/.agentprism/workflows` | AgentPrism's `AGENTPRISM_PERSISTENCE_ROOT`. Also changeable from the panel footer. |
 | Notify me | on | Finished, failed, lost and waiting runs. |
 | Finished runs to show | 12 | Live runs always show. |
+| Metro line size | comfortable | How tall the history rows' metro lines draw: `compact` (thin lines, more rows on screen), `comfortable`, or `large` (thicker rail, bigger stations, taller agent tracks and blocks). Rail, stations, tracks, crowd blocks, a fold's bars and the row height all grow together. A change shows at once. |
 | Passed runs stay green for (minutes) | 15 | How long the status bar shows a pass in green after its run ended. 0 never does; at most 10080 (a week). |
 | Failed runs stay red for (minutes) | 1440 | How long the status bar shows a failure in red after its run ended, unless a newer run passes first. 0 never does; at most 10080. |
 
@@ -127,7 +128,9 @@ node scripts/simulate-run.mjs --root ~/.odw/runs-demo --loop
 
 # The panel in a browser, driven by the real worker on a stand-in Orca host:
 node --import ./dev/register.mjs dev/preview.mjs --root ~/.odw/runs-demo [--agentprism test/fixtures/agentprism]
-# then http://127.0.0.1:4517/  (?theme=light, ?w=320)
+# then http://127.0.0.1:4517/  (?theme=light, ?w=320); --metro compact|comfortable|large picks the metro size
 ```
+
+The preview's stand-in Settings: `curl -X POST -H 'content-type: application/json' -d '{"name":"dev.setting","input":{"key":"metroSize","value":"large"}}' http://127.0.0.1:4517/request` changes a setting while the page is open, the way Orca's Settings page does.
 
 Type-check with `tsc -p .` and `@types/node` available; Orca's typings land in `.orca/types/` (`orca plugin types .`). To try the status bar, approve the development folder, open any Orca workspace, and run an ODW or AgentPrism workflow from a watched runs folder. Look for **Workflows** in Orca's status bar. `orca plugin shot . --status-bar` captures the bar on the desktop.

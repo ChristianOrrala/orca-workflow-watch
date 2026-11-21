@@ -15,7 +15,8 @@ import { hostname, platform } from 'node:os'
 import { isAgentId, isLive } from './model'
 import { cliRunner, findCopies, findOrcaCli, parse, RemoteHosts } from './remote'
 import { BeaconWriter } from './beacon'
-import type { EngineId, EngineInfo, RunState, RunView, Snapshot } from './protocol'
+import type { EngineId, EngineInfo, MetroSize, RunState, RunView, Snapshot } from './protocol'
+import { DEFAULT_METRO_SIZE, metroSize } from './settings'
 import { FAIL_HIGHLIGHT_MINUTES, highlightMinutes, PASS_HIGHLIGHT_MINUTES, workflowStatus } from './status'
 import type { RunSource } from './sources/types'
 import { OdwSource } from './sources/odw'
@@ -75,6 +76,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   const sourceOf = (engine: EngineId | null | undefined) => sources.find((s) => s.id === (engine ?? 'odw')) ?? odw
   let history = 12
   let notify = true
+  let metro: MetroSize = DEFAULT_METRO_SIZE
   let remotesWanted = 'auto'
   let cliSetting = ''
   const localName = friendlyName()
@@ -235,7 +237,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     let finished = 0
     const runs = all.filter((r) => isLive(r.state) || finished++ < history)
     const hosts = remote.hosts()
-    const next: Snapshot = { ...local, runs, hosts }
+    const next: Snapshot = { ...local, runs, hosts, metroSize: metro }
     // Changes are found before the history limit, so a long job that ends below it still
     // announces. Each host gets its own baseline: the first time its runs arrive they are
     // recorded, not announced, and an outage keeps that host's states for when it is back.
@@ -336,6 +338,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const nextPrism = expandHome(typeof all.agentprismRoot === 'string' && all.agentprismRoot.trim() ? all.agentprismRoot.trim() : DEFAULT_AGENTPRISM_ROOT)
     history = typeof all.history === 'number' ? Math.min(50, Math.max(1, Math.round(all.history))) : 12
     notify = all.notifications !== false
+    metro = metroSize(all.metroSize)
     passMinutes = highlightMinutes(all.passHighlightMinutes, PASS_HIGHLIGHT_MINUTES)
     failMinutes = highlightMinutes(all.failHighlightMinutes, FAIL_HIGHLIGHT_MINUTES)
     const nextRemotes = typeof all.remotes === 'string' ? all.remotes.trim() : 'auto'

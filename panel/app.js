@@ -1104,7 +1104,8 @@
     el.replaceChildren(
       ...slices.map((slice) => {
         const bar = h('i', slice.some((x) => x.failed) ? 'f' : '')
-        bar.style.height = `${Math.max(5, Math.round(6 + (Math.max(...slice.map((x) => x.took)) / longest) * 18))}px`
+        // Its share of the slowest run; the stylesheet turns it into a height for the metro size.
+        bar.style.setProperty('--f', (Math.max(...slice.map((x) => x.took)) / longest).toFixed(3))
         return bar
       }),
     )
@@ -1558,6 +1559,9 @@
     const now = Date.now()
     ui.lastHeard = now
     ui.snap = snap
+    // The "Metro line size" setting: one attribute, and the stylesheet sizes every part from it.
+    const metro = ['compact', 'comfortable', 'large'].includes(snap.metroSize) ? snap.metroSize : 'comfortable'
+    if (document.documentElement.dataset.metro !== metro) document.documentElement.dataset.metro = metro
     if (booting() && !ui.bootTimer) ui.bootTimer = setTimeout(() => document.documentElement.classList.remove('boot'), 400)
     for (const run of snap.runs) {
       const key = runKey(run)

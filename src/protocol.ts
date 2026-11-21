@@ -169,7 +169,11 @@ export interface Snapshot {
   localName: string
   scannedAt: number
   error: string | null
+  /** How tall the history rows' metro lines draw: the "Metro line size" setting. */
+  metroSize?: MetroSize
 }
+
+export type MetroSize = 'compact' | 'comfortable' | 'large'
 
 /** Every log line a run keeps, oldest first, for "Show all"; `dropped` older ones are gone. */
 export interface RunLog {
