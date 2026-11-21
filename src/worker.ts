@@ -16,7 +16,7 @@ import { isAgentId, isLive } from './model'
 import { cliRunner, findCopies, findOrcaCli, parse, RemoteHosts } from './remote'
 import { BeaconWriter } from './beacon'
 import type { EngineId, EngineInfo, RunState, RunView, Snapshot } from './protocol'
-import { workflowStatus } from './status'
+import { FAIL_HIGHLIGHT_MINUTES, highlightMinutes, PASS_HIGHLIGHT_MINUTES, workflowStatus } from './status'
 import type { RunSource } from './sources/types'
 import { OdwSource } from './sources/odw'
 import { AgentPrismSource } from './sources/agentprism'
@@ -91,6 +91,11 @@ export default function activate(orca: OrcaWorkerApi): void {
   let timer: ReturnType<typeof setTimeout> | null = null
   let remoteTimer: ReturnType<typeof setInterval> | null = null
   let debounce: ReturnType<typeof setTimeout> | null = null
+  // The status bar's next change of its own (a pass or failure going calm), and what it was drawn from.
+  let statusTimer: ReturnType<typeof setTimeout> | null = null
+  let statusRuns: RunView[] = []
+  let passMinutes = PASS_HIGHLIGHT_MINUTES
+  let failMinutes = FAIL_HIGHLIGHT_MINUTES
 
   // Every line this worker logs goes through here, so the beacon can count them (./beacon).
   const beacon = new BeaconWriter({ write: (line) => orca.log(line) })
@@ -172,7 +177,18 @@ export default function activate(orca: OrcaWorkerApi): void {
   }
 
   function updateStatusBar(runs: RunView[]): void {
-    const params = workflowStatus(runs, local.error, local.engines.filter((e) => e.error).map((e) => e.id))
+    statusRuns = runs
+    const now = Date.now()
+    const { until, ...params } = workflowStatus(runs, local.error, local.engines.filter((e) => e.error).map((e) => e.id), { now, passMinutes, failMinutes })
+    if (statusTimer) clearTimeout(statusTimer)
+    statusTimer = null
+    // Redraw from the same runs when the highlight runs out; reading the runs again is not needed.
+    if (until !== null) {
+      statusTimer = setTimeout(() => {
+        statusTimer = null
+        updateStatusBar(statusRuns)
+      }, Math.max(0, until - now) + 50)
+    }
     const key = JSON.stringify(params)
     if (key === lastStatus) return
     lastStatus = key
@@ -320,6 +336,8 @@ export default function activate(orca: OrcaWorkerApi): void {
     const nextPrism = expandHome(typeof all.agentprismRoot === 'string' && all.agentprismRoot.trim() ? all.agentprismRoot.trim() : DEFAULT_AGENTPRISM_ROOT)
     history = typeof all.history === 'number' ? Math.min(50, Math.max(1, Math.round(all.history))) : 12
     notify = all.notifications !== false
+    passMinutes = highlightMinutes(all.passHighlightMinutes, PASS_HIGHLIGHT_MINUTES)
+    failMinutes = highlightMinutes(all.failHighlightMinutes, FAIL_HIGHLIGHT_MINUTES)
     const nextRemotes = typeof all.remotes === 'string' ? all.remotes.trim() : 'auto'
     const nextCli = typeof all.orcaCli === 'string' ? all.orcaCli.trim() : ''
     if (nextRemotes !== remotesWanted || nextCli !== cliSetting) {
@@ -352,7 +370,8 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (timer) clearTimeout(timer)
     if (debounce) clearTimeout(debounce)
     if (remoteTimer) clearInterval(remoteTimer)
-    timer = debounce = remoteTimer = null
+    if (statusTimer) clearTimeout(statusTimer)
+    timer = debounce = remoteTimer = statusTimer = null
   }
 
   const ready = (async () => {

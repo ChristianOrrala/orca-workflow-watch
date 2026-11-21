@@ -108,6 +108,24 @@
         "maximum": 50
       },
       {
+        "key": "passHighlightMinutes",
+        "title": "Passed runs stay green for (minutes)",
+        "description": "How long the status bar shows a pass in green after its run ended. 0 never shows it green.",
+        "type": "integer",
+        "default": 15,
+        "minimum": 0,
+        "maximum": 10080
+      },
+      {
+        "key": "failHighlightMinutes",
+        "title": "Failed runs stay red for (minutes)",
+        "description": "How long the status bar shows a failure in red after its run ended, unless a newer run passes first. 0 never shows it red.",
+        "type": "integer",
+        "default": 1440,
+        "minimum": 0,
+        "maximum": 10080
+      },
+      {
         "key": "remotes",
         "title": "Paired servers to watch",
         "description": "auto: every paired Orca server that runs this plugin too. Or a comma-separated list of server names, or off.",
