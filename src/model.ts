@@ -530,6 +530,7 @@ export function buildView(files: RunFiles, acc: RunAccumulator, alive: (pid: unk
   const updatedAt = Math.max(ms(status?.updatedAt) ?? 0, acc.lastTs ?? 0, startedAt)
   const endedAt = isLive(state) ? null : acc.endedAt ?? updatedAt
   const source = str(meta?.source)
+  const branch = str(meta?.branch) ?? str(status?.branch)
   const about = subjectOf(meta?.args)
   const spent = num(status?.spentTokens) ?? allAgents.reduce((sum, a) => sum + (a.tokens ?? 0), 0)
 
@@ -545,6 +546,7 @@ export function buildView(files: RunFiles, acc: RunAccumulator, alive: (pid: unk
     updatedAt,
     endedAt,
     source: source ? basename(source) : null,
+    ...(branch ? { branch: clip(branch, 200) } : {}),
     subject: about?.subject ?? null,
     subjectLabel: about?.label ?? null,
     dry: meta?.dry === true,

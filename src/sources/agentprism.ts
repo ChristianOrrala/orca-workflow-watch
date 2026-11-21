@@ -411,6 +411,7 @@ export class AgentPrismWatch {
           createdAt: seconds(snap.startedAt) ?? this.file.startedAt / 1000,
           args: snap.args,
           source: this.file.projectDir ?? str(snap.effectiveCwd),
+          branch: str(snap.branch),
           adapter: this.backend,
           budgetTotal: null,
         },

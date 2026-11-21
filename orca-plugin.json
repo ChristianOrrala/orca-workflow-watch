@@ -3,7 +3,7 @@
   "manifestVersion": 2,
   "id": "workflow-watch-orca",
   "name": "Workflow Watch for Orca",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Every workflow run, live, beside your code. Watch Open Dynamic Workflows and AgentPrism runs in Orca's sidebar, from this computer and your paired servers: each phase and agent on a timeline, the whole run log, and a notification when a run finishes or needs you. A community plugin, not made or endorsed by Orca.",
   "author": {
     "name": "Christian Orrala",
@@ -57,19 +57,19 @@
     ],
     "commands": [
       {
-        "id": "workflowWatch.toggleSidebar",
-        "title": "Workflow Watch for Orca: Show or hide the sidebar",
-        "action": "sidebar.right.toggle"
+        "id": "workflowWatch.open",
+        "title": "Workflow Watch for Orca: Open Workflows",
+        "when": "workspace"
       }
     ],
     "statusBarItems": [
       {
         "id": "workflows",
-        "text": "Workflows",
+        "text": "Workflows · Idle",
         "icon": "activity",
         "tone": "neutral",
         "tooltip": "Workflow Watch for Orca",
-        "command": "workflowWatch.toggleSidebar"
+        "command": "workflowWatch.open"
       }
     ],
     "settings": [

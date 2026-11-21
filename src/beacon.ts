@@ -125,6 +125,7 @@ export function runWire(run: RunView): Obj {
   if (run.description) w.ds = clip(run.description, 400)
   if (run.endedAt !== null) w.e = run.endedAt - a
   if (run.source) w.sc = run.source
+  if (run.branch) w.br = clip(run.branch, 200)
   if (run.subject) w.sj = run.subject
   if (run.subjectLabel) w.sl = clip(run.subjectLabel, 200)
   if (run.dry) w.dr = 1
@@ -176,6 +177,7 @@ export function decodeRun(v: unknown): RunView | null {
     updatedAt: abs(v.u, a) ?? a,
     endedAt: abs(v.e, a),
     source: v.sc ?? null,
+    branch: v.br,
     subject: v.sj ?? null,
     subjectLabel: v.sl ?? null,
     dry: v.dr === 1,

@@ -67,7 +67,7 @@ The panel then shows a chip for each paired server under the runs. One without t
 - **History rows:** finished runs, each drawn as a metro line: its phases as stations, its agents as tracks. Click a row to open the full card. Back-to-back runs of one workflow that all ended well fold into one row (`review-swarm ×7`) with a bar per run, and it opens; a failure or a question keeps its own row, and a question a newer run took over reads "Asked".
 - **Paired servers:** with paired servers, each row and card names the computer it ran on, and a chip for each computer sits under the list. A server out of reach reads "unreachable" in the header, one without the plugin reads "not set up", and one whose runs stopped coming for 30 s reads "not updating" (its runs leave the list until they come back). Everything in a run's card comes across: its phases and their times, its agents with their state, times and tokens, its checkpoints, and its last log lines. "Show all" on a server's newest run (the one started last, live or ended) shows its last 50 events. What an agent was asked and answered, and the rest of a run's log, stay on the server; the panel says so where they would show.
 - **Stale data shows:** with a live run on screen and no word from the worker for 30 s, the clocks dim and a "no updates" chip appears (the worker posts at least every 10 s).
-- **Status bar and notifications:** a `Workflows` item reports running and waiting runs, and a desktop notification fires when a run finishes, fails, stops answering or waits for you. The status bar item keeps the worker running, so the notifications still arrive with the panel closed.
+- **Status bar and notifications:** `Workflows` shows the running count across all watched workspaces and paired servers. When nothing is running, it shows waiting or paused runs, the latest result, or idle. Hover for active workflow names, statuses, branches when recorded, and paired-server names. Click to open the Workflows panel. No GitHub connection is needed. The status bar keeps the worker running, so finish, failure, lost-run and checkpoint notifications still arrive with the panel closed.
 
 It only reads, and never writes into a run. Both engines keep each run as plain files, and the worker follows them with a file watcher plus a slow poll, so neither engine's server has to run.
 
@@ -103,7 +103,7 @@ A plugin worker runs on the computer whose Orca loaded it, and the plugin API do
 
 `trusted-worker` (its worker is Node and reads the runs folders), `settings:own`, `notifications:show`. It opens no network connection itself and no terminal. It does run local programs:
 
-- **The Orca CLI**, to read each paired Orca server's plugin list and this plugin's log there (every few seconds while a run is live), and, from a server's development folder, an agent's detail when you open one. Set "Paired servers to watch" to `off` and it reads none. It also writes this computer's runs into its own plugin log, for the desktops paired to it ([Paired servers](#paired-servers)).
+- **The Orca CLI**, to open the Workflows panel from the status bar, to read each paired Orca server's plugin list and this plugin's log there (every few seconds while a run is live), and, from a server's development folder, an agent's detail when you open one. Set "Paired servers to watch" to `off` and it reads none. It also writes this computer's runs into its own plugin log, for the desktops paired to it ([Paired servers](#paired-servers)).
 - **The clipboard program** (`pbcopy`, `clip`, `wl-copy`, `xclip` or `xsel`) when you press Copy, with the text on its input.
 - **`ps`**, on macOS, to check that a run's recorded process is still the same one (ODW's own check).
 
@@ -128,4 +128,4 @@ node --import ./dev/register.mjs dev/preview.mjs --root ~/.odw/runs-demo [--agen
 # then http://127.0.0.1:4517/  (?theme=light, ?w=320)
 ```
 
-Type-check with `tsc -p .` and `@types/node` available; Orca's typings land in `.orca/types/` (`orca plugin types .`).
+Type-check with `tsc -p .` and `@types/node` available; Orca's typings land in `.orca/types/` (`orca plugin types .`). To try the status bar, approve the development folder, open any Orca workspace, and run an ODW or AgentPrism workflow from a watched runs folder. Look for **Workflows** in Orca's status bar. `orca plugin shot . --status-bar` captures the bar on the desktop.

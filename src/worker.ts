@@ -12,15 +12,17 @@ import type { OrcaWorkerApi } from 'orca/worker'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { hostname, platform } from 'node:os'
-import { isLive } from './model'
-import { cliRunner, findOrcaCli, RemoteHosts } from './remote'
+import { isAgentId, isLive } from './model'
+import { cliRunner, findCopies, findOrcaCli, parse, RemoteHosts } from './remote'
 import { BeaconWriter } from './beacon'
 import type { EngineId, EngineInfo, RunState, RunView, Snapshot } from './protocol'
-import { isAgentId } from './model'
+import { workflowStatus } from './status'
 import type { RunSource } from './sources/types'
 import { OdwSource } from './sources/odw'
 import { AgentPrismSource } from './sources/agentprism'
 import { expandHome } from './sources/paths'
+
+export { needsYou } from './status'
 
 const DEFAULT_ROOT = '~/.odw/runs'
 const DEFAULT_AGENTPRISM_ROOT = '~/.agentprism/workflows'
@@ -49,25 +51,6 @@ function failure(code: string, message: string): Error {
 
 const keyOf = (run: RunView) => `${run.host ?? 'local'}:${run.engine ?? 'odw'}:${run.id}`
 
-/**
- * A run that ended asking the owner something, and that no newer run took over: a newer run
- * of the same workflow, on the same host, about the same subject (the same plan, say). A run
- * on another plan leaves the question standing.
- */
-export function needsYou(run: RunView, runs: RunView[]): boolean {
-  if (run.outcome?.tone !== 'attention') return false
-  return !runs.some(
-    (r) =>
-      r !== run &&
-      (r.engine ?? 'odw') === (run.engine ?? 'odw') &&
-      r.workflow === run.workflow &&
-      r.host === run.host &&
-      // The same project: a workflow of one name in another repository is another question.
-      (r.source ?? null) === (run.source ?? null) &&
-      r.subject === run.subject &&
-      r.startedAt > run.startedAt,
-  )
-}
 const byLiveThenNewest = (a: RunView, b: RunView) => Number(isLive(b.state)) - Number(isLive(a.state)) || b.startedAt - a.startedAt
 
 /** "Mac mini" on macOS (its Computer Name), else the host name's first label. */
@@ -117,6 +100,16 @@ export default function activate(orca: OrcaWorkerApi): void {
   }
 
   let run = cliRunner(findOrcaCli(null))
+  orca.commands.register('workflowWatch.open', async () => {
+    // The worker API doesn't expose panel opening. Orca's CLI explicitly supports it;
+    // discover the key so development folders and catalog installs both work.
+    const list = parse(await run(['plugin', 'list', '--environment', 'local', '--json'], 3000))
+    const copies = findCopies(list, PLUGIN_ID)?.readable ?? []
+    const copy = copies.find((candidate) => candidate.isDev) ?? copies[0]
+    if (!copy) throw new Error('Workflow Watch is not available on this Orca host.')
+    const opened = await run(['plugin', 'open', copy.key, '--panel', 'runs', '--environment', 'local', '--json'], 3000)
+    if (!parse(opened).ok) throw new Error('Could not open the Workflows panel.')
+  })
   const remote = new RemoteHosts({
     run: (args, timeoutMs) => run(args, timeoutMs),
     pluginId: PLUGIN_ID,
@@ -178,33 +171,14 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (title) void orca.host.call('notifications.show', { title, body }).catch(() => undefined)
   }
 
-  function updateStatusBar(next: Snapshot): void {
-    // A paused run is not working: nothing moves until it is resumed (an AgentPrism one has no
-    // process at all), so it is counted apart from the running ones.
-    const running = next.runs.filter((r) => r.state === 'running').length
-    const paused = next.runs.filter((r) => r.state === 'paused')
-    const asking = next.runs.filter((r) => r.state === 'waiting' || needsYou(r, next.runs))
-    const waiting = asking.length
-    const agents = next.runs.reduce((sum, r) => sum + (isLive(r.state) ? r.agents.running : 0), 0)
-    const params = waiting
-      ? { id: STATUS_ITEM, text: `Workflows · ${waiting} waiting`, tone: 'warning' as const, icon: 'bell' as const }
-      : running
-        ? { id: STATUS_ITEM, text: `Workflows · ${running} running`, tone: 'accent' as const, icon: 'activity' as const }
-        : paused.length
-          ? { id: STATUS_ITEM, text: `Workflows · ${paused.length} paused`, tone: 'neutral' as const, icon: 'activity' as const }
-          : { id: STATUS_ITEM, text: 'Workflows', tone: 'neutral' as const, icon: 'activity' as const }
-    const where = (r: RunView) => (r.hostName ? ` (${r.hostName})` : '')
-    const tooltip = waiting
-      ? asking.map((r) => `${r.workflow}${where(r)}: ${r.waiting?.title ?? r.outcome?.text ?? 'waiting'}`).join('\n')
-      : running
-        ? `${agents} agent${agents === 1 ? '' : 's'} working${paused.length ? `, ${paused.length} paused` : ''}`
-        : paused.length
-          ? paused.map((r) => `${r.workflow}${where(r)}: ${r.error ?? 'paused'}`).join('\n')
-          : `Watching ${next.engines.map((e) => `${e.label} ${e.root}`).join(', ')}${next.hosts.length ? `, and ${next.hosts.map((h) => h.name).join(', ')}` : ''}`
-    const key = JSON.stringify([params, tooltip])
+  function updateStatusBar(runs: RunView[]): void {
+    const params = workflowStatus(runs, local.error, local.engines.filter((e) => e.error).map((e) => e.id))
+    const key = JSON.stringify(params)
     if (key === lastStatus) return
     lastStatus = key
-    void orca.host.call('statusBar.update', { ...params, tooltip, visible: true }).catch(() => undefined)
+    void orca.host.call('statusBar.update', { id: STATUS_ITEM, ...params }).catch(() => {
+      if (key === lastStatus) lastStatus = ''
+    })
   }
 
   /**
@@ -273,7 +247,7 @@ export default function activate(orca: OrcaWorkerApi): void {
       lastPostAt = Date.now()
       orca.panels.post('watch.changed', JSON.parse(text) as Snapshot)
     }
-    updateStatusBar(next)
+    updateStatusBar(all)
     return next
   }
 

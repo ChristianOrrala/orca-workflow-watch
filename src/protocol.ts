@@ -68,6 +68,8 @@ export interface RunView {
   endedAt: number | null
   /** Folder name of the repository the run worked in. */
   source: string | null
+  /** Branch when recorded by the workflow engine; older paired servers can omit it. */
+  branch?: string
   /**
    * What the run was about, from its args: a short hash of `run_dir`, `plan_file`, `plan`,
    * `spec`, `target`, `issue` or `task` (the first one set), else of all its args. Two runs of

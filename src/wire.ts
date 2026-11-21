@@ -96,6 +96,7 @@ export function normalizeRun(v: unknown): RunView | null {
     ? { title: text(v.waiting.title, 400) ?? 'a checkpoint', since: time(v.waiting.since) ?? startedAt, checkpointId: time(v.waiting.checkpointId) }
     : null
   const log = (Array.isArray(v.log) ? v.log : []).slice(-LOG_LINES_MAX).map(logOf).filter((l): l is LogLine => l !== null)
+  const branch = text(v.branch, 200)
   return {
     id: v.id,
     engine: oneOf(v.engine, ENGINES, 'odw'),
@@ -108,6 +109,7 @@ export function normalizeRun(v: unknown): RunView | null {
     updatedAt: time(v.updatedAt) ?? startedAt,
     endedAt: time(v.endedAt),
     source: text(v.source, 200),
+    ...(branch ? { branch } : {}),
     subject: text(v.subject, 80),
     subjectLabel: text(v.subjectLabel, 200),
     dry: v.dry === true,
